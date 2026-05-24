@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>極致高質感字卡系統 - 完整版</title>
+    <!-- 引入 SheetJS 用於解析 Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        /* CSS 變數定義 */
+        :root {
+            --bg-main: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.7);
+            --bg-modal: #1e293b;
+            --accent: #38bdf8;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-top: env(safe-area-inset-top, 0px);
+        }
+
+        /* 全域重設，啟用 border-box 防止溢出 */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            height: 100svh;
+            overflow: hidden;
+            display: block;
+        }
+
+        /* 主畫面佈局 */
+        .home-container {
+            height: 100svh;
+            padding: calc(var(--safe-top) + 30px) 20px calc(var(--safe-bottom) + 30px) 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+        }
+
+        .header-section {
+            text-align: center;
+            width: 100%;
+        }
+
+        .header-section h1 {
+            font-size: 24pt;
+            margin: 0 0 10px 0;
+            letter-spacing: 2px;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-section p {
+            color: var(--text-sub);
+            font-size: 11pt;
+            margin: 0;
+        }
+
+        .menu-buttons {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        /* 有質感的橫式按鈕 */
+        .nav-btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            color: var(--text-main);
+            font-size: 12pt;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: transform 0.2s, background-color 0.2s;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .nav-btn:active {
+            transform: scale(0.97);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* 全螢幕遮罩層層級 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100svh;
+            background-color: var(--bg-modal);
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            padding-top: var(--safe-top);
+            padding-bottom: var(--safe-bottom);
+        }
+
+        /* 遮罩頂部導覽列，固定不動 */
+        .modal-header {
+            height: 60px;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-modal);
+        }
+
+        .modal-title {
+            font-size: 13pt;
+            font-weight: bold;
+        }
+
+        /* 返回按鈕樣式，徹底避開邊緣防止誤觸 */
+        .back-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 10.5pt;
+            cursor: pointer;
+        }
+        .back-btn:active { background: rgba(255, 255, 255, 0.2); }
+
+        /* 遮罩內容滾動區：關鍵防網頁下拉重整設定 */
+        .modal-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            overscroll-behavior-y: contain; /* 隔離重整手勢 */
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* 表單與操作元件群組 */
+        .form-group {
+            margin-bottom: 24px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 11pt;
+            color: var(--text-sub);
+            margin-bottom: 8px;
+        }
+        .input-text {
+            width: 100%;
+            padding: 12px;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 11pt;
+        }
+        .input-text:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* 欄位勾選網格 */
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .check-item {
+            background: rgba(255,255,255,0.04);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11pt;
+        }
+        .check-item input[type="checkbox"], .check-item input[type="radio"] {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* 顏色選擇網格 */
+        .color-pick-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255,255,255,0.02);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid var(--border);
+        }
+        .color-picker {
+            border: none;
+            background: transparent;
+            width: 40px;
+            height: 30px;
+            cursor: pointer;
+        }
+
+        /* 動態拉伸字卡樣式 */
+        .flashcard-preview-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .flashcard {
+            width: 100%;
+            max-width: 320px;
+            min-height: 180px; /* 最小高度 */
+            height: auto;      /* 隨內容動態拉伸 */
+            background: #1e293b;
+            border-radius: 20px;
+            border: 4px solid #64748b; /* 預設顏色 */
+            padding: 24px;
+            position: relative;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: border-color 0.3s, transform 0.2s;
+        }
+        .flashcard:active {
+            transform: scale(0.99);
+        }
+        .card-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 9pt;
+            font-weight: bold;
+            color: #fff;
+        }
+        .card-side-indicator {
+            font-size: 9pt;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+        .card-main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            justify-content: center;
+        }
+        .card-field-block {
+            margin: 4px 0;
+        }
+        .card-field-title {
+            font-size: 9pt;
+            color: var(--text-sub);
+            margin-bottom: 2px;
+        }
+        .card-field-value {
+            font-size: 13pt;
+            font-weight: 500;
+            color: #fff;
+            word-break: break-all;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        /* 雙按鈕控制列（用於學習區切換） */
+        .card-controls {
+            display: flex;
+            gap: 16px;
+            width: 100%;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+        .control-btn {
+            flex: 1;
+            padding: 12px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: white;
+            font-size: 11pt;
+            cursor: pointer;
+            text-align: center;
+        }
+        .control-btn:active { background: rgba(255,255,255,0.2); }
+
+        /* 儲存按鈕 */
+        .action-btn {
+            width: 100%;
+            padding: 14px;
+            background: #0284c7;
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 12pt;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .action-btn:active { background: #0369a1; }
+
+        /* 列表樣式 */
+        .item-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .list-item {
+            background: rgba(255,255,255,0.04);
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 測驗模組特殊樣式 */
+        .quiz-intro, .quiz-playground, .quiz-result-view {
+            display: none;
+        }
+        .quiz-options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .option-btn {
+            width: 100%;
+            padding: 16px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 11pt;
+            text-align: left;
+            cursor: pointer;
+        }
+        .option-btn:active { background: rgba(255,255,255,0.15); }
+        
+        /* 答題即時反饋全螢幕遮罩 */
+        .feedback-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100svh;
+            z-index: 999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 90pt;
+            font-weight: bold;
+        }
+        .feedback-o { background: rgba(22, 163, 74, 0.9); color: white; }
+        .feedback-x { background: rgba(220, 38, 38, 0.9); color: white; }
+
+        /* 進度條樣式 */
+        .progress-container {
+            width: 100%;
+            background: rgba(255,255,255,0.1);
+            height: 12px;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--accent);
+            transition: width 0.3s;
+        }
+
+        /* 精美提示通知彈窗 (Toast) */
+        .toast {
+            position: fixed;
+            bottom: calc(var(--safe-bottom) + 30px);
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #ef4444;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            z-index: 1000;
+            font-weight: bold;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+            white-space: nowrap;
+            display: block;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        .toast.success { background: #10b981; }
+    </style>
+</head>
+<body>
+
+    <!-- 主畫面結構 -->
+    <div class="home-container">
+        <div class="header-section">
+            <h1>SMART CARDS</h1>
+            <p>高質感全自由度學習字卡系統</p>
+        </div>
+
+        <div class="menu-buttons">
+            <button class="nav-btn" onclick="openModal('modal-study')">學習區 (觀看卡片)</button>
+            <button class="nav-btn" onclick="openModal('modal-cards')" style="background:rgba(56,189,248,0.15); border-color:rgba(56,189,248,0.3);">建立字卡</button>
+            <button class="nav-btn" onclick="openModal('modal-quiz')">測驗</button>
+            <button class="nav-btn" onclick="openModal('modal-db')">資料庫</button>
+            <button class="nav-btn" onclick="openModal('modal-import')">匯入 EXCEL</button>
+            <button class="nav-btn" onclick="openModal('modal-settings')">設定</button>
+        </div>
+        <div style="font-size:9pt; color:var(--text-sub);">Powered by IndexedDB & SheetJS</div>
+    </div>
+
+    <!-- 0. 新增：學習區模組遮罩 -->
+    <div id="modal-study" class="modal-overlay">
+        <div class="modal-header">
+            <span class="modal-title">卡片學習核心區</span>
+            <button class="back-btn" onclick="closeModal('modal-study')">返回</button>
+        </div>
+        <div class="modal-content">
+            <div class="form-group">
+                <label>選擇欲學習的字卡集</label>
+                <select id="study-project-select" class="input-text" onchange="onStudyProjectSelect()">
+                    <option value="">-- 請選擇字卡集 --</option>
+                </select>
+            </div>
+
+            <!-- 學習卡片戰場（有資料時才呈現） -->
+            <div id="study-playground" style="display:none; margin-top:20px;">
+                <div style="text-align:center; font-size:10pt; color:var(--text-sub);" id="study-index-text">卡片位置: 0 / 0</div>
+                
+                <div class="flashcard-preview-container">
+                    <div class="flashcard" id="study-card" onclick="flipStudyCard()">
+                        <div class="card-badge" id="study-card-badge">分類</div>
+                        <div>
+                            <div class="card-side-indicator" id="study-card-side">正面</div>
+                            <div class="card-main-content" id="study-card-main"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 控制切換按鈕 -->
+                <div class="card-controls">
+                    <button class="control-btn" onclick="switchStudyCard(-1)">上一張</button>
+                    <button class="control-btn" onclick="switchStudyCard(1)" style="background:var(--accent); color:#0f172a; font-weight:bold;">下一張</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. 建立字卡模組遮罩 -->
+    <div id="modal-cards" class="modal-overlay">
+        <div class="modal-header">
+            <span class="modal-title">製作與配置自訂字卡集</span>
+            <button class="back-btn" onclick="closeModal('modal-cards')">返回</button>
+        </div>
+        <div class="modal-content">
+            <div class="form-group">
+                <label>選擇資料來源庫</label>
+                <select id="card-db-select" class="input-text" onchange="onCardDBChange()">
+                    <option value="">-- 請選擇原始資料庫 --</option>
+                </select>
+            </div>
+            
+            <div id="card-config-zone" style="display:none;">
+                <div class="form-group">
+                    <label>正面顯示欄位 (可多選)</label>
+                    <div id="card-front-fields" class="checkbox-grid"></div>
+                </div>
+                <div class="form-group">
+                    <label>反面顯示欄位 (可多選)</label>
+                    <div id="card-back-fields" class="checkbox-grid"></div>
+                </div>
+                <div class="form-group">
+                    <label>選擇一欄作為外框分類</label>
+                    <div id="card-class-fields" class="checkbox-grid"></div>
+                </div>
+                <div class="form-group" id="color-setup-group" style="display:none;">
+                    <label>為分類關鍵字設定顏色</label>
+                    <div id="color-picker-list"></div>
+                </div>
+            </div>
+
+            <!-- 動態即時預覽區 -->
+            <div class="form-group">
+                <label>字卡動態即時預覽 (點擊可切換正反面)</label>
+                <div class="flashcard-preview-container">
+                    <div class="flashcard" id="preview-card" onclick="flipPreviewCard()">
+                        <div class="card-badge" id="preview-badge" style="background:#64748b;">分類</div>
+                        <div>
+                            <div class="card-side-indicator" id="preview-side">正面 (點擊翻面)</div>
+                            <div class="card-main-content" id="preview-main">
+                                <div class="card-field-value" style="text-align:center; color:var(--text-sub);">請先選取上方原始資料庫</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="action-btn" id="save-card-project-btn" style="display:none;" onclick="saveCardProject()">確認以此配置創立字卡集</button>
+            
+            <div class="form-group" style="margin-top:30px;">
+                <label>目前已建立的字卡集</label>
+                <div id="card-projects-list" class="item-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 測驗模組遮罩 -->
+    <div id="modal-quiz" class="modal-overlay">
+        <div class="modal-header">
+            <span class="modal-title">隨機四選一測驗</span>
+            <button class="back-btn" onclick="handleQuizBack()">返回</button>
+        </div>
+        <div class="modal-content">
+            <div id="quiz-intro-zone" class="quiz-intro" style="display:block;">
+                <div class="form-group">
+                    <label>選擇要練習的字卡項目</label>
+                    <select id="quiz-project-select" class="input-text" onchange="onQuizProjectSelect()">
+                        <option value="">-- 請選擇字卡集 --</option>
+                    </select>
+                </div>
+                <div class="form-group" id="quiz-count-group" style="display:none;">
+                    <label id="quiz-max-hint">欲抽考題數</label>
+                    <input type="number" id="quiz-count-input" class="input-text" min="1" value="20">
+                </div>
+                <button class="action-btn" id="start-quiz-btn" style="display:none;" onclick="startQuiz()">開始小遊戲測驗</button>
+            </div>
+
+            <div id="quiz-play-zone" class="quiz-playground">
+                <div style="display:flex; justify-content:space-between; font-size:11pt; color:var(--text-sub);">
+                    <span id="quiz-progress-text">問題: 0 / 0</span>
+                    <span id="quiz-score-text">答對: 0</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar" id="quiz-progress-bar"></div>
+                </div>
+
+                <div class="flashcard-preview-container">
+                    <div class="flashcard" id="quiz-question-card">
+                        <div class="card-badge" id="quiz-card-badge">分類</div>
+                        <div>
+                            <div class="card-side-indicator" id="quiz-card-side">題目面</div>
+                            <div class="card-main-content" id="quiz-card-main"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="quiz-options" id="quiz-options-container"></div>
+            </div>
+
+            <div id="quiz-result-zone" class="quiz-result-view">
+                <h2 style="text-align:center; color:var(--accent); margin-bottom:20px;">🎉 測驗完成！</h2>
+                <div class="list-item"><span>總題目數</span><span id="res-total" style="font-weight:bold;">0</span></div>
+                <div class="list-item" style="margin-top:6px;"><span>答對題數</span><span id="res-right" style="color:#10b981; font-weight:bold;">0</span></div>
+                <div class="list-item" style="margin-top:6px;"><span>答錯題數</span><span id="res-wrong" style="color:#ef4444; font-weight:bold;">0</span></div>
+                <div class="list-item" style="margin-top:6px; background:rgba(56,189,248,0.1);"><span>答題正確率</span><span id="res-rate" style="color:var(--accent); font-weight:bold;">0%</span></div>
+                <button class="action-btn" style="margin-top:30px; background:#475569;" onclick="resetQuizToIntro()">返回測驗主頁</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 資料庫模組遮罩 -->
+    <div id="modal-db" class="modal-overlay">
+        <div class="modal-header">
+            <span class="modal-title">現存原始資料庫</span>
+            <button class="back-btn" onclick="closeModal('modal-db')">返回</button>
+        </div>
+        <div class="modal-content">
+            <div id="db-list-container" class="item-list"></div>
+        </div>
+    </div>
+
+    <!-- 4. 匯入 EXCEL 模組遮罩 -->
+    <div id="modal-import" class="modal-overlay">
+        <div class="modal-header">
+            <span class="modal-title">匯入 EXCEL 創建資料庫</span>
+            <button class="back-btn" onclick="closeModal('modal-import')">返回</button>
+        </div>
+        <div class="modal-content">
+            <div class="form-group">
+                <label>選擇本地 Excel 檔案 (.xlsx, .xls)</label>
+                <input type="file" id="excel-file-input" class="input-text" accept=".xlsx, .xls" onchange="handleExcelUpload(this)">
+            </div>
+            <div id="import-config-zone" style="display:none;">
+                <div class="form-group">
+                    <label>自訂此資料庫名稱 (防呆必填)</label>
+                    <input type="text" id="new-db-name" class="input-text" placeholder="例如：藥學資料庫">
+                </div>
+                <div class="form-group">
+                    <label>勾選欲儲存進系統的欄位標題</label>
+                    <div id="excel-headers-grid" class="checkbox-grid"></div>
+                </div>
+                <button class="action-btn" onclick="submitImport()">確認導入 IndexedDB 資料庫</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. 設定模組遮罩 -->
+    <div id="modal-settings" class="modal-overlay">
+        <div class="modal-header">
+            <span class="modal-title">系統設定與儲存空間</span>
+            <button class="back-btn" onclick="closeModal('modal-settings')">返回</button>
+        </div>
+        <div class="modal-content">
+            <div class="form-group">
+                <label>瀏覽器 IndexedDB 本地儲存空間占比</label>
+                <div class="progress-container" style="height:20px; background:rgba(0,0,0,0.3);">
+                    <div class="progress-bar" id="storage-progress" style="background: #10b981; width:0.1%;"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:9.5pt; color:var(--text-sub); margin-top:6px;">
+                    <span id="storage-used">已用: 0 MB</span>
+                    <span id="storage-total">可用上限: -- MB</span>
+                </div>
+            </div>
+            <hr style="border:0; border-top:1px solid var(--border); margin:30px 0;">
+            <div class="form-group">
+                <label>系統存檔備份資料</label>
+                <button class="action-btn" style="background:#818cf8; margin-bottom:12px;" onclick="exportSystemBackup()">匯出存檔 (.json)</button>
+                <label style="margin-top:15px;">還原存檔系統</label>
+                <input type="file" id="backup-import-input" class="input-text" accept=".json" onchange="importSystemBackup(this)">
+            </div>
+        </div>
+    </div>
+
+    <!-- 即時作答反饋與提示元件 -->
+    <div id="quiz-feedback" class="feedback-overlay">O</div>
+    <div id="toast-notice" class="toast">提示訊息</div>
+
+    <script>
+        /*************************************************************
+         * 1. 資料核心庫 (IndexedDB 封裝)
+         *************************************************************/
+        let db;
+        const DB_NAME = "SmartFlashcardSystemDB";
+        const DB_VERSION = 1;
+
+        function initIndexedDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = function(e) {
+                    const database = e.target.result;
+                    if (!database.objectStoreNames.contains("raw_databases")) {
+                        database.createObjectStore("raw_databases", { keyPath: "dbName" });
+                    }
+                    if (!database.objectStoreNames.contains("card_projects")) {
+                        database.createObjectStore("card_projects", { keyPath: "projectName" });
+                    }
+                };
+                request.onsuccess = function(e) {
+                    db = e.target.result;
+                    updateStorageEstimate();
+                    resolve();
+                };
+                request.onerror = function(e) { reject(e); };
+            });
+        }
+
+        function saveData(storeName, data) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, "readwrite");
+                const store = tx.objectStore(storeName);
+                const req = store.put(data);
+                req.onsuccess = () => resolve();
+                req.onerror = (e) => reject(e);
+            });
+        }
+
+        function getAllData(storeName) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, "readonly");
+                const store = tx.objectStore(storeName);
+                const req = store.getAll();
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = (e) => reject(e);
+            });
+        }
+
+        function deleteData(storeName, key) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, "readwrite");
+                const store = tx.objectStore(storeName);
+                const req = store.delete(key);
+                req.onsuccess = () => resolve();
+                req.onerror = (e) => reject(e);
+            });
+        }
+
+        /*************************************************************
+         * 2. 全域 UI 控制器
+         *************************************************************/
+        function openModal(id) {
+            document.getElementById(id).style.display = "flex";
+            if (id === 'modal-study') { refreshStudyModule(); }
+            if (id === 'modal-cards') { refreshCardModule(); }
+            if (id === 'modal-db') { renderRawDBList(); }
+            if (id === 'modal-quiz') { refreshQuizModule(); }
+            if (id === 'modal-settings') { updateStorageEstimate(); }
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = "none";
+        }
+
+        function showToast(message, isSuccess = true) {
+            const toast = document.getElementById("toast-notice");
+            toast.innerText = message;
+            if (isSuccess) toast.classList.add("success");
+            else toast.classList.remove("success");
+            toast.classList.add("show");
+            setTimeout(() => { toast.classList.remove("show"); }, 2500);
+        }
+
+        /*************************************************************
+         * 3. 新增功能：學習區模組 (觀看、手動切換、點擊翻面)
+         *************************************************************/
+        let studyProjects = [];
+        let curStudyProject = null;
+        let curStudyDB = null;
+        let curStudyIndex = 0;
+        let curStudyIsBack = false;
+
+        async function refreshStudyModule() {
+            const select = document.getElementById("study-project-select");
+            select.innerHTML = `<option value="">-- 請選擇字卡集 --</option>`;
+            document.getElementById("study-playground").style.display = "none";
+
+            studyProjects = await getAllData("card_projects");
+            studyProjects.forEach(p => {
+                select.innerHTML += `<option value="${p.projectName}">${p.projectName}</option>`;
+            });
+        }
+
+        async function onStudyProjectSelect() {
+            const pName = document.getElementById("study-project-select").value;
+            const playground = document.getElementById("study-playground");
+
+            if (!pName) {
+                playground.style.display = "none";
+                return;
+            }
+
+            curStudyProject = studyProjects.find(p => p.projectName === pName);
+            const dbs = await getAllData("raw_databases");
+            curStudyDB = dbs.find(d => d.dbName === curStudyProject.sourceDB);
+
+            if (!curStudyDB || curStudyDB.rows.length === 0) {
+                showToast("防呆：該項目原始資料庫不存在或無數據！", false);
+                playground.style.display = "none";
+                return;
+            }
+
+            curStudyIndex = 0;
+            curStudyIsBack = false;
+            playground.style.display = "block";
+            renderStudyCard();
+        }
+
+        function renderStudyCard() {
+            if (!curStudyDB || curStudyDB.rows.length === 0) return;
+
+            const rowData = curStudyDB.rows[curStudyIndex];
+            document.getElementById("study-index-text").innerText = `卡片位置: ${curStudyIndex + 1} / ${curStudyDB.rows.length}`;
+
+            const badge = document.getElementById("study-card-badge");
+            const sideText = document.getElementById("study-card-side");
+            const mainContent = document.getElementById("study-card-main");
+            const cardElement = document.getElementById("study-card");
+
+            // 分類與外框著色
+            const classField = curStudyProject.classField;
+            if (classField !== "__none__") {
+                const classVal = String(rowData[classField] || "無").trim();
+                badge.innerText = classVal;
+                badge.style.display = "block";
+                cardElement.style.borderColor = curStudyProject.colorMap[classVal] || "#64748b";
+            } else {
+                badge.style.display = "none";
+                cardElement.style.borderColor = "#64748b";
+            }
+
+            // 正反面內容判定
+            sideText.innerText = curStudyIsBack ? "反面內容 (點擊可翻面)" : "正面內容 (點擊可翻面)";
+            const activeFields = curStudyIsBack ? curStudyProject.backFields : curStudyProject.frontFields;
+
+            mainContent.innerHTML = "";
+            activeFields.forEach(f => {
+                mainContent.innerHTML += `
+                    <div class="card-field-block">
+                        <div class="card-field-title">${f}</div>
+                        <div class="card-field-value">${rowData[f] || "（空）"}</div>
+                    </div>
+                `;
+            });
+        }
+
+        function flipStudyCard() {
+            curStudyIsBack = !curStudyIsBack;
+            renderStudyCard();
+        }
+
+        function switchStudyCard(step) {
+            if (!curStudyDB) return;
+            let newIndex = curStudyIndex + step;
+            
+            // 邊界防呆
+            if (newIndex < 0) {
+                showToast("這已經是第一張卡片了！", false);
+                return;
+            }
+            if (newIndex >= curStudyDB.rows.length) {
+                showToast("已觀看完最後一張卡片！", true);
+                return;
+            }
+
+            curStudyIndex = newIndex;
+            curStudyIsBack = false; // 切換卡片時自動恢復為正面開局
+            renderStudyCard();
+        }
+
+        /*************************************************************
+         * 4. 建立字卡模組 (含：製作完成後自動還原重整機制)
+         *************************************************************/
+        let currentDBForCard = null;
+        let previewIsBack = false;
+
+        async function refreshCardModule() {
+            resetCardCreationZone(); // 開啟畫面時，先將前次狀態重整清空
+            const select = document.getElementById("card-db-select");
+            select.innerHTML = `<option value="">-- 請選擇原始資料庫 --</option>`;
+            const dbs = await getAllData("raw_databases");
+            dbs.forEach(d => {
+                select.innerHTML += `<option value="${d.dbName}">${d.dbName}</option>`;
+            });
+            renderCardProjectsList();
+        }
+
+        // 新增：將字卡製作畫面全面重整還原回初始樣貌的函數
+        function resetCardCreationZone() {
+            document.getElementById("card-db-select").value = "";
+            document.getElementById("card-config-zone").style.display = "none";
+            document.getElementById("save-card-project-btn").style.display = "none";
+            document.getElementById("color-setup-group").style.display = "none";
+            
+            // 還原預覽卡片外觀
+            previewIsBack = false;
+            currentDBForCard = null;
+            const cardElement = document.getElementById("preview-card");
+            cardElement.style.borderColor = "#64748b";
+            document.getElementById("preview-badge").style.display = "none";
+            document.getElementById("preview-side").innerText = "正面 (點擊翻面)";
+            document.getElementById("preview-main").innerHTML = `
+                <div class="card-field-value" style="text-align:center; color:var(--text-sub);">請先選取上方原始資料庫</div>
+            `;
+        }
+
+        async function onCardDBChange() {
+            const dbName = document.getElementById("card-db-select").value;
+            const configZone = document.getElementById("card-config-zone");
+            const saveBtn = document.getElementById("save-card-project-btn");
+            
+            if (!dbName) {
+                resetCardCreationZone();
+                return;
+            }
+
+            const dbs = await getAllData("raw_databases");
+            currentDBForCard = dbs.find(d => d.dbName === dbName);
+            if (!currentDBForCard) return;
+
+            renderFieldCheckboxes("card-front-fields", "front", currentDBForCard.headers);
+            renderFieldCheckboxes("card-back-fields", "back", currentDBForCard.headers);
+            renderFieldRadios("card-class-fields", "class", currentDBForCard.headers);
+
+            configZone.style.display = "block";
+            saveBtn.style.display = "block";
+            document.getElementById("color-setup-group").style.display = "none";
+            triggerCardPreviewUpdate();
+        }
+
+        function renderFieldCheckboxes(containerId, prefix, headers) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = "";
+            headers.forEach(h => {
+                container.innerHTML += `
+                    <label class="check-item">
+                        <input type="checkbox" name="card-${prefix}-cb" value="${h}" onchange="triggerCardPreviewUpdate()">
+                        <span>${h}</span>
+                    </label>
+                `;
+            });
+        }
+
+        function renderFieldRadios(containerId, prefix, headers) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = "";
+            container.innerHTML += `
+                <label class="check-item">
+                    <input type="radio" name="card-${prefix}-ro" value="__none__" checked onchange="onClassRadioChange()">
+                    <span>無分類</span>
+                </label>
+            `;
+            headers.forEach(h => {
+                container.innerHTML += `
+                    <label class="check-item">
+                        <input type="radio" name="card-${prefix}-ro" value="${h}" onchange="onClassRadioChange()">
+                        <span>${h}</span>
+                    </label>
+                `;
+            });
+        }
+
+        function onClassRadioChange() {
+            const selectedClassField = document.querySelector('input[name="card-class-ro"]:checked').value;
+            const colorGroup = document.getElementById("color-setup-group");
+            const colorList = document.getElementById("color-picker-list");
+            
+            if (selectedClassField === "__none__" || !currentDBForCard) {
+                colorGroup.style.display = "none";
+                triggerCardPreviewUpdate();
+                return;
+            }
+
+            const allVals = currentDBForCard.rows.map(r => String(r[selectedClassField] || "無")).map(v => v.trim());
+            const uniqueKeywords = Array.from(new Set(allVals)).filter(v => v !== "");
+
+            colorList.innerHTML = "";
+            const defaultColors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6"];
+            
+            uniqueKeywords.forEach((kw, index) => {
+                const chosenColor = defaultColors[index % defaultColors.length];
+                colorList.innerHTML += `
+                    <div class="color-pick-row">
+                        <span style="font-size:10.5pt;">${kw}</span>
+                        <input type="color" class="color-picker" data-keyword="${kw}" value="${chosenColor}" onchange="triggerCardPreviewUpdate()">
+                    </div>
+                `;
+            });
+
+            colorGroup.style.display = "block";
+            triggerCardPreviewUpdate();
+        }
+
+        function triggerCardPreviewUpdate() {
+            if (!currentDBForCard || currentDBForCard.rows.length === 0) return;
+            const sampleRow = currentDBForCard.rows[0];
+
+            const frontFields = Array.from(document.querySelectorAll('input[name="card-front-cb"]:checked')).map(cb => cb.value);
+            const backFields = Array.from(document.querySelectorAll('input[name="card-back-cb"]:checked')).map(cb => cb.value);
+            const classField = document.querySelector('input[name="card-class-ro"]:checked')?.value || "__none__";
+
+            const badge = document.getElementById("preview-badge");
+            const cardElement = document.getElementById("preview-card");
+            const mainContent = document.getElementById("preview-main");
+            const sideIndicator = document.getElementById("preview-side");
+
+            if (classField !== "__none__") {
+                const rowValue = String(sampleRow[classField] || "無").trim();
+                badge.innerText = rowValue;
+                badge.style.display = "block";
+                const picker = document.querySelector(`input[type="color"][data-keyword="${rowValue}"]`);
+                cardElement.style.borderColor = picker ? picker.value : "#64748b";
+            } else {
+                badge.style.display = "none";
+                cardElement.style.borderColor = "#64748b";
+            }
+
+            sideIndicator.innerText = previewIsBack ? "反面 (點擊翻面)" : "正面 (點擊翻面)";
+            const activeFields = previewIsBack ? backFields : frontFields;
+
+            mainContent.innerHTML = "";
+            if (activeFields.length === 0) {
+                mainContent.innerHTML = `<div style="text-align:center; color:var(--text-sub); font-size:11pt;">請勾選欄位展示內容</div>`;
+                return;
+            }
+
+            activeFields.forEach(f => {
+                mainContent.innerHTML += `
+                    <div class="card-field-block">
+                        <div class="card-field-title">${f}</div>
+                        <div class="card-field-value">${sampleRow[f] || "（空）"}</div>
+                    </div>
+                `;
+            });
+        }
+
+        function flipPreviewCard() {
+            previewIsBack = !previewIsBack;
+            triggerCardPreviewUpdate();
+        }
+
+        async function saveCardProject() {
+            if (!currentDBForCard) return;
+
+            const frontFields = Array.from(document.querySelectorAll('input[name="card-front-cb"]:checked')).map(cb => cb.value);
+            const backFields = Array.from(document.querySelectorAll('input[name="card-back-cb"]:checked')).map(cb => cb.value);
+            const classField = document.querySelector('input[name="card-class-ro"]:checked')?.value || "__none__";
+
+            if (frontFields.length === 0 || backFields.length === 0) {
+                showToast("防呆：卡片正面與反面必須至少各挑選一個展示欄位！", false);
+                return;
+            }
+
+            let colorMap = {};
+            if (classField !== "__none__") {
+                const pickers = document.querySelectorAll('#color-picker-list input[type="color"]');
+                pickers.forEach(p => { colorMap[p.getAttribute("data-keyword")] = p.value; });
+            }
+
+            const projectName = prompt("請為這套自訂字卡集命名：", currentDBForCard.dbName + "_字卡");
+            if (!projectName || !projectName.trim()) {
+                showToast("防呆：必須輸入字卡集名稱！", false);
+                return;
+            }
+
+            const projectPayload = {
+                projectName: projectName.trim(),
+                sourceDB: currentDBForCard.dbName,
+                frontFields: frontFields,
+                backFields: backFields,
+                classField: classField,
+                colorMap: colorMap,
+                createdAt: Date.now()
+            };
+
+            await saveData("card_projects", projectPayload);
+            showToast(`字卡集「${projectName}」創立完成！`, true);
+            
+            // 優化 1 實現點：製作完成後，將製作畫面全面還原重整回初始狀態
+            resetCardCreationZone();
+            renderCardProjectsList();
+        }
+
+        async function renderCardProjectsList() {
+            const container = document.getElementById("card-projects-list");
+            container.innerHTML = "";
+            const projects = await getAllData("card_projects");
+
+            if (projects.length === 0) {
+                container.innerHTML = `<div style="text-align:center; color:var(--text-sub); padding:10px;">目前尚無自訂字卡項目</div>`;
+                return;
+            }
+
+            projects.forEach(p => {
+                const item = document.createElement("div");
+                item.className = "list-item";
+                item.innerHTML = `
+                    <div>
+                        <div style="font-weight:bold; color:var(--accent);">${p.projectName}</div>
+                        <div style="font-size:9pt; color:var(--text-sub); margin-top:4px;">
+                            來源庫: ${p.sourceDB} | 正: ${p.frontFields.length}欄 / 反: ${p.backFields.length}欄
+                        </div>
+                    </div>
+                    <button class="back-btn" style="background:#ef4444; border:none;" onclick="deleteCardProject('${p.projectName}')">移除</button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        async function deleteCardProject(name) {
+            if (confirm(`確定移除「${name}」字卡集配置嗎？`)) {
+                await deleteData("card_projects", name);
+                renderCardProjectsList();
+                showToast("字卡集已移除", true);
+            }
+        }
+
+        /*************************************************************
+         * 5. 測驗遊戲模組
+         *************************************************************/
+        let allCardProjects = [];
+        let selectedProject = null;
+        let selectedRawDBData = null;
+        let quizQueue = [];
+        let currentQuizIndex = 0;
+        let quizCorrectCount = 0;
+        let quizWrongCount = 0;
+
+        async function refreshQuizModule() {
+            resetQuizToIntro();
+            const select = document.getElementById("quiz-project-select");
+            select.innerHTML = `<option value="">-- 請選擇字卡集 --</option>`;
+            allCardProjects = await getAllData("card_projects");
+            allCardProjects.forEach(p => { select.innerHTML += `<option value="${p.projectName}">${p.projectName}</option>`; });
+        }
+
+        async function onQuizProjectSelect() {
+            const projName = document.getElementById("quiz-project-select").value;
+            const countGroup = document.getElementById("quiz-count-group");
+            const startBtn = document.getElementById("start-quiz-btn");
+
+            if (!projName) {
+                countGroup.style.display = "none";
+                startBtn.style.display = "none";
+                return;
+            }
+
+            selectedProject = allCardProjects.find(p => p.projectName === projName);
+            const dbs = await getAllData("raw_databases");
+            selectedRawDBData = dbs.find(d => d.dbName === selectedProject.sourceDB);
+
+            if (!selectedRawDBData || selectedRawDBData.rows.length === 0) {
+                showToast("防呆：找不到該原始資料庫！", false);
+                return;
+            }
+
+            const totalAvailable = selectedRawDBData.rows.length;
+            document.getElementById("quiz-max-hint").innerText = `欲抽考題數 (共有 ${totalAvailable} 張)`;
+            document.getElementById("quiz-count-input").value = Math.min(20, totalAvailable);
+            document.getElementById("quiz-count-input").max = totalAvailable;
+
+            countGroup.style.display = "block";
+            startBtn.style.display = "block";
+        }
+
+        function startQuiz() {
+            const countInput = parseInt(document.getElementById("quiz-count-input").value);
+            const totalAvailable = selectedRawDBData.rows.length;
+
+            if (isNaN(countInput) || countInput <= 0 || countInput > totalAvailable) {
+                showToast(`防呆：抽考數量請填寫 1 到 ${totalAvailable} 之間的數字！`, false);
+                return;
+            }
+
+            let indices = Array.from({ length: totalAvailable }, (_, i) => i);
+            for (let i = indices.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [indices[i], indices[j]] = [indices[j], indices[i]];
+            }
+
+            quizQueue = indices.slice(0, countInput).map(idx => {
+                return {
+                    rowIndex: idx,
+                    rowTarget: selectedRawDBData.rows[idx],
+                    askSide: Math.random() < 0.5 ? "front" : "back"
+                };
+            });
+
+            currentQuizIndex = 0;
+            quizCorrectCount = 0;
+            quizWrongCount = 0;
+
+            document.getElementById("quiz-intro-zone").style.display = "none";
+            document.getElementById("quiz-play-zone").style.display = "block";
+            renderQuizQuestion();
+        }
+
+        function renderQuizQuestion() {
+            if (currentQuizIndex >= quizQueue.length) {
+                endQuizAndShowResult();
+                return;
+            }
+
+            const currentQuestion = quizQueue[currentQuizIndex];
+            const rowData = currentQuestion.rowTarget;
+
+            document.getElementById("quiz-progress-text").innerText = `問題: ${currentQuizIndex + 1} / ${quizQueue.length}`;
+            document.getElementById("quiz-score-text").innerText = `答對: ${quizCorrectCount}`;
+            document.getElementById("quiz-progress-bar").style.width = `${(currentQuizIndex / quizQueue.length) * 100}%`;
+
+            const cardBadge = document.getElementById("quiz-card-badge");
+            const cardSideText = document.getElementById("quiz-card-side");
+            const cardMain = document.getElementById("quiz-card-main");
+            const cardElement = document.getElementById("quiz-question-card");
+
+            const classField = selectedProject.classField;
+            if (classField !== "__none__") {
+                const classVal = String(rowData[classField] || "無").trim();
+                cardBadge.innerText = classVal;
+                cardBadge.style.display = "block";
+                cardElement.style.borderColor = selectedProject.colorMap[classVal] || "#64748b";
+            } else {
+                cardBadge.style.display = "none";
+                cardElement.style.borderColor = "#64748b";
+            }
+
+            cardSideText.innerText = currentQuestion.askSide === "front" ? "題目面：卡片正面內容" : "題目面：卡片反面內容";
+            const fieldsToDisplay = currentQuestion.askSide === "front" ? selectedProject.frontFields : selectedProject.backFields;
+            
+            cardMain.innerHTML = "";
+            fieldsToDisplay.forEach(f => {
+                cardMain.innerHTML += `
+                    <div class="card-field-block">
+                        <div class="card-field-title">${f}</div>
+                        <div class="card-field-value">${rowData[f] || "（空）"}</div>
+                    </div>
+                `;
+            });
+
+            const optionSide = currentQuestion.askSide === "front" ? "back" : "front";
+            const optionFields = optionSide === "front" ? selectedProject.frontFields : selectedProject.backFields;
+            const correctText = buildOptionString(rowData, optionFields);
+
+            let wrongOptions = [];
+            let allRows = selectedRawDBData.rows;
+            let availableIndices = Array.from({length: allRows.length}, (_, i) => i).filter(i => i !== currentQuestion.rowIndex);
+
+            for (let i = availableIndices.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [availableIndices[i], availableIndices[j]] = [availableIndices[j], availableIndices[i]];
+            }
+
+            for (let i = 0; i < availableIndices.length; i++) {
+                if (wrongOptions.length >= 3) break;
+                const wText = buildOptionString(allRows[availableIndices[i]], optionFields);
+                if (wText !== correctText && !wrongOptions.includes(wText)) { wrongOptions.push(wText); }
+            }
+
+            while (wrongOptions.length < 3) { wrongOptions.push(`（無其餘數據干擾項-${wrongOptions.length}）`); }
+
+            let finalFour = [
+                { isCorrect: true, text: correctText },
+                { isCorrect: false, text: wrongOptions[0] },
+                { isCorrect: false, text: wrongOptions[1] },
+                { isCorrect: false, text: wrongOptions[2] }
+            ];
+
+            for (let i = finalFour.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [finalFour[i], finalFour[j]] = [finalFour[j], finalFour[i]];
+            }
+
+            const optionsContainer = document.getElementById("quiz-options-container");
+            optionsContainer.innerHTML = "";
+            finalFour.forEach(opt => {
+                const btn = document.createElement("button");
+                btn.className = "option-btn";
+                btn.innerText = opt.text;
+                btn.onclick = () => handleAnswerSelect(opt.isCorrect);
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function buildOptionString(row, fields) {
+            return fields.map(f => `${f}:${row[f] || ""}`).join(" | ");
+        }
+
+        function handleAnswerSelect(isCorrect) {
+            const feedback = document.getElementById("quiz-feedback");
+            if (isCorrect) {
+                quizCorrectCount++;
+                feedback.className = "feedback-overlay feedback-o";
+                feedback.innerText = "O";
+            } else {
+                quizWrongCount++;
+                feedback.className = "feedback-overlay feedback-x";
+                feedback.innerText = "X";
+            }
+            feedback.style.display = "flex";
+            setTimeout(() => {
+                feedback.style.display = "none";
+                currentQuizIndex++;
+                renderQuizQuestion();
+            }, 550);
+        }
+
+        function endQuizAndShowResult() {
+            document.getElementById("quiz-play-zone").style.display = "none";
+            document.getElementById("quiz-result-zone").style.display = "block";
+            document.getElementById("res-total").innerText = quizQueue.length;
+            document.getElementById("res-right").innerText = quizCorrectCount;
+            document.getElementById("res-wrong").innerText = quizWrongCount;
+            const rate = quizQueue.length > 0 ? Math.round((quizCorrectCount / quizQueue.length) * 100) : 0;
+            document.getElementById("res-rate").innerText = `${rate}%`;
+        }
+
+        function resetQuizToIntro() {
+            document.getElementById("quiz-intro-zone").style.display = "block";
+            document.getElementById("quiz-play-zone").style.display = "none";
+            document.getElementById("quiz-result-zone").style.display = "none";
+            document.getElementById("quiz-project-select").value = "";
+            document.getElementById("quiz-count-group").style.display = "none";
+            document.getElementById("start-quiz-btn").style.display = "none";
+        }
+
+        function handleQuizBack() {
+            if (document.getElementById("quiz-play-zone").style.display === "block") {
+                if (!confirm("測驗正在進行中，確定要放棄並返回嗎？")) return;
+            }
+            closeModal('modal-quiz');
+        }
+
+        /*************************************************************
+         * 6. 匯入與設定備份模組
+         *************************************************************/
+        let tempExcelData = null;
+
+        function handleExcelUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                    
+                    if (!json || json.length === 0) {
+                        showToast("防呆：該 Excel 檔案數據為空！", false);
+                        return;
+                    }
+                    const headers = Object.keys(json[0]);
+                    tempExcelData = { headers: headers, rows: json };
+                    document.getElementById("new-db-name").value = file.name.replace(/\.[^/.]+$/, "");
+                    
+                    const grid = document.getElementById("excel-headers-grid");
+                    grid.innerHTML = "";
+                    headers.forEach(h => {
+                        grid.innerHTML += `
+                            <label class="check-item">
+                                <input type="checkbox" name="import-fields" value="${h}" checked>
+                                <span>${h}</span>
+                            </label>
+                        `;
+                    });
+                    document.getElementById("import-config-zone").style.display = "block";
+                } catch (err) { showToast("Excel 解析失敗", false); }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        async function submitImport() {
+            const dbNameInput = document.getElementById("new-db-name").value.trim();
+            if (!dbNameInput) { showToast("請填寫資料庫名稱！", false); return; }
+            const checkedBoxes = document.querySelectorAll('input[name="import-fields"]:checked');
+            if (checkedBoxes.length === 0) { showToast("請至少勾選一個欄位！", false); return; }
+
+            const selectedFields = Array.from(checkedBoxes).map(cb => cb.value);
+            const filteredRows = tempExcelData.rows.map(row => {
+                let newRow = {};
+                selectedFields.forEach(f => { newRow[f] = row[f] || ""; });
+                return newRow;
+            });
+
+            await saveData("raw_databases", { dbName: dbNameInput, headers: selectedFields, rows: filteredRows, createdAt: Date.now() });
+            showToast(`資料庫「${dbNameInput}」已成功導入！`, true);
+            document.getElementById("import-config-zone").style.display = "none";
+            document.getElementById("excel-file-input").value = "";
+            closeModal("modal-import");
+        }
+
+        async function renderRawDBList() {
+            const listContainer = document.getElementById("db-list-container");
+            listContainer.innerHTML = "";
+            const dbs = await getAllData("raw_databases");
+            if (dbs.length === 0) {
+                listContainer.innerHTML = `<div style="text-align:center; color:var(--text-sub); padding:20px;">目前無資料庫，請先匯入 Excel</div>`;
+                return;
+            }
+            dbs.forEach(database => {
+                const item = document.createElement("div");
+                item.className = "list-item";
+                item.innerHTML = `
+                    <div>
+                        <div style="font-weight:bold;">${database.dbName}</div>
+                        <div style="font-size:9.5pt; color:var(--text-sub); margin-top:4px;">共 ${database.rows.length} 筆</div>
+                    </div>
+                    <button class="back-btn" style="background:#ef4444; border:none;" onclick="deleteRawDB('${database.dbName}')">刪除</button>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        async function deleteRawDB(name) {
+            if (confirm(`確定要刪除「${name}」原始資料庫嗎？`)) {
+                await deleteData("raw_databases", name);
+                renderRawDBList();
+            }
+        }
+
+        async function updateStorageEstimate() {
+            if (navigator.storage && navigator.storage.estimate) {
+                const est = await navigator.storage.estimate();
+                const usedMB = (est.usage / (1024 * 1024)).toFixed(2);
+                const quotaMB = (est.quota / (1024 * 1024)).toFixed(2);
+                const pct = ((est.usage / est.quota) * 100).toFixed(2);
+                document.getElementById("storage-used").innerText = `已用: ${usedMB} MB`;
+                document.getElementById("storage-total").innerText = `上限: ${quotaMB} MB (${pct}%)`;
+                document.getElementById("storage-progress").style.width = `${Math.max(0.1, pct)}%`;
+            }
+        }
+
+        async function exportSystemBackup() {
+            const saveName = prompt("請輸入備份名稱：", "備份_" + new Date().toISOString().slice(0,10));
+            if (!saveName || !saveName.trim()) return;
+            const backupData = { raw_databases: await getAllData("raw_databases"), card_projects: await getAllData("card_projects") };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData));
+            const dl = document.createElement('a');
+            dl.setAttribute("href", dataStr); dl.setAttribute("download", `${saveName.trim()}.json`);
+            document.body.appendChild(dl); dl.click(); dl.remove();
+        }
+
+        function importSystemBackup(input) {
+            const file = input.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const obj = JSON.parse(e.target.result);
+                    if (confirm("確認覆蓋導入此備份存檔？")) {
+                        for (let d of obj.raw_databases || []) await saveData("raw_databases", d);
+                        for (let p of obj.card_projects || []) await saveData("card_projects", p);
+                        showToast("還原成功！", true); closeModal("modal-settings");
+                    }
+                } catch(e) { showToast("檔案損壞", false); }
+            };
+            reader.readAsText(file);
+        }
+
+        window.addEventListener("DOMContentLoaded", () => { initIndexedDB(); });
+    </script>
+</body>
+</html>
