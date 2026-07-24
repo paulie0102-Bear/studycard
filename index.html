@@ -7,9 +7,9 @@
     <!-- 引入 SheetJS 用於解析 Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-    
     <!-- PWA Manifest 連結 -->
 <link rel="manifest" href="./manifest.json">
+
 <!-- 💡 iOS 專屬 PWA 必備標籤 -->
 <!-- 1. 允許全螢幕（隱藏 Safari 網址列與底欄） -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -738,18 +738,54 @@
         </div>
     </div>
 
-    <!-- 3. 資料庫模組遮罩 (新增：手動新增卡片按鈕) -->
+    <!-- 3. 資料庫模組遮罩 (支援手動新建空白資料庫 + 瀏覽現有庫) -->
 <div id="modal-db" class="modal-overlay">
     <div class="modal-header">
         <span class="modal-title">現存原始資料庫</span>
         <button class="back-btn" onclick="closeModal('modal-db')">返回</button>
     </div>
     <div class="modal-content">
+        <!-- 新增：點擊即可建立空白資料庫的按鈕 -->
+        <button class="action-btn" style="background:var(--accent); color:#0f172a; font-weight:bold; margin-bottom:15px;" onclick="openCreateBlankDBModal()">
+            ➕ 手動新建空白資料庫
+        </button>
+
         <div id="db-list-container" class="item-list"></div>
     </div>
 </div>
 
-<!-- 3.5 新增：手動新增卡片彈窗遮罩 -->
+<!-- 3.1 新增：手動建立全新空白資料庫遮罩 -->
+<div id="modal-create-db" class="modal-overlay">
+    <div class="modal-header">
+        <span class="modal-title">建立全新空白資料庫</span>
+        <button class="back-btn" onclick="closeModal('modal-create-db')">取消</button>
+    </div>
+    <div class="modal-content">
+        <div class="form-group">
+            <label>資料庫名稱 (防呆必填)</label>
+            <input type="text" id="manual-db-name" class="input-text" placeholder="例如：日文50音字卡">
+        </div>
+        <div class="form-group">
+            <label>設定欄位標題 (請用半形逗號 , 分隔)</label>
+            <input type="text" id="manual-db-headers" class="input-text" placeholder="例如：平假名, 片假名, 羅馬拼音, 範例單字" oninput="previewManualFields()">
+            <div style="font-size:8.5pt; color:var(--text-sub); margin-top:4px;">💡 這些標題將成為後續卡片的正反面欄位來源</div>
+        </div>
+
+        <!-- 動態即時預覽欄位標籤 -->
+        <div class="form-group">
+            <label>欄位預覽標籤</label>
+            <div id="manual-headers-preview" style="display:flex; flex-wrap:wrap; gap:6px; padding:8px; background:rgba(255,255,255,0.05); border-radius:6px; min-height:38px;">
+                <span style="color:var(--text-sub); font-size:9pt;">輸入上方欄位後將在此顯示預覽...</span>
+            </div>
+        </div>
+
+        <button class="action-btn" style="margin-top:15px; background:#10b981; font-weight:bold;" onclick="submitCreateBlankDB()">
+            💾 儲存並建立空白資料庫
+        </button>
+    </div>
+</div>
+
+<!-- 3.5 手動新增卡片彈窗遮罩 (針對特定資料庫寫入卡片內容) -->
 <div id="modal-add-card" class="modal-overlay">
     <div class="modal-header">
         <span class="modal-title" id="add-card-modal-title">手動新增卡片</span>
@@ -761,30 +797,30 @@
     </div>
 </div>
 
-    <!-- 4. 匯入 EXCEL 模組遮罩 -->
-    <div id="modal-import" class="modal-overlay">
-        <div class="modal-header">
-            <span class="modal-title">匯入 EXCEL 創建資料庫</span>
-            <button class="back-btn" onclick="closeModal('modal-import')">返回</button>
+<!-- 4. 匯入 EXCEL 模組遮罩 -->
+<div id="modal-import" class="modal-overlay">
+    <div class="modal-header">
+        <span class="modal-title">匯入 EXCEL 創建資料庫</span>
+        <button class="back-btn" onclick="closeModal('modal-import')">返回</button>
+    </div>
+    <div class="modal-content">
+        <div class="form-group">
+            <label>選擇本地 Excel 檔案 (.xlsx, .xls)</label>
+            <input type="file" id="excel-file-input" class="input-text" accept=".xlsx, .xls" onchange="handleExcelUpload(this)">
         </div>
-        <div class="modal-content">
+        <div id="import-config-zone" style="display:none;">
             <div class="form-group">
-                <label>選擇本地 Excel 檔案 (.xlsx, .xls)</label>
-                <input type="file" id="excel-file-input" class="input-text" accept=".xlsx, .xls" onchange="handleExcelUpload(this)">
+                <label>自訂此資料庫名稱 (防呆必填)</label>
+                <input type="text" id="new-db-name" class="input-text" placeholder="例如：藥學資料庫">
             </div>
-            <div id="import-config-zone" style="display:none;">
-                <div class="form-group">
-                    <label>自訂此資料庫名稱 (防呆必填)</label>
-                    <input type="text" id="new-db-name" class="input-text" placeholder="例如：藥學資料庫">
-                </div>
-                <div class="form-group">
-                    <label>勾選欲儲存進系統的欄位標題</label>
-                    <div id="excel-headers-grid" class="checkbox-grid"></div>
-                </div>
-                <button class="action-btn" onclick="submitImport()">確認導入 IndexedDB 資料庫</button>
+            <div class="form-group">
+                <label>勾選欲儲存進系統的欄位標題</label>
+                <div id="excel-headers-grid" class="checkbox-grid"></div>
             </div>
+            <button class="action-btn" onclick="submitImport()">確認導入 IndexedDB 資料庫</button>
         </div>
     </div>
+</div>
 
     <!-- 5. 設定模組遮罩 -->
     <div id="modal-settings" class="modal-overlay">
@@ -1443,6 +1479,90 @@ function switchStudyCard(step) {
         }
 
         /*************************************************************
+ * 手動建立空白資料庫核心邏輯
+ *************************************************************/
+
+// 4-1. 開啟手動建立資料庫彈窗
+function openCreateBlankDBModal() {
+    document.getElementById("manual-db-name").value = "";
+    document.getElementById("manual-db-headers").value = "";
+    document.getElementById("manual-headers-preview").innerHTML = `
+        <span style="color:var(--text-sub); font-size:9pt;">輸入上方欄位後將在此顯示預覽...</span>
+    `;
+    openModal("modal-create-db");
+}
+
+// 4-2. 即時解析並預覽欄位標籤
+function previewManualFields() {
+    const headerInput = document.getElementById("manual-db-headers").value;
+    const previewContainer = document.getElementById("manual-headers-preview");
+    
+    // 以半形逗號分割，並過濾掉空白字元
+    const headers = headerInput.split(',')
+        .map(h => h.trim())
+        .filter(h => h.length > 0);
+
+    if (headers.length === 0) {
+        previewContainer.innerHTML = `<span style="color:var(--text-sub); font-size:9pt;">輸入上方欄位後將在此顯示預覽...</span>`;
+        return;
+    }
+
+    // 渲染為可視化標籤（Chip 樣式）
+    previewContainer.innerHTML = headers.map(h => `
+        <div style="background:rgba(56,189,248,0.2); border:1px solid var(--accent); color:#fff; padding:4px 10px; border-radius:12px; font-size:9pt; display:inline-block;">
+            📌 ${h}
+        </div>
+    `).join("");
+}
+
+// 4-3. 儲存空白資料庫至 IndexedDB (含即時刷新 UI)
+async function submitCreateBlankDB() {
+    const dbName = document.getElementById("manual-db-name").value.trim();
+    const headerInput = document.getElementById("manual-db-headers").value;
+
+    // 解析欄位
+    const headers = headerInput.split(',')
+        .map(h => h.trim())
+        .filter(h => h.length > 0);
+
+    // 防呆驗證
+    if (!dbName) {
+        showToast("防呆：請輸入資料庫名稱！", false);
+        return;
+    }
+    if (headers.length === 0) {
+        showToast("防呆：請至少設定一個欄位標題 (用逗號分隔)！", false);
+        return;
+    }
+
+    // 檢查是否有同名資料庫
+    const existingDBs = await getAllData("raw_databases");
+    if (existingDBs.some(d => d.dbName === dbName)) {
+        showToast(`防呆：資料庫名稱「${dbName}」已存在！`, false);
+        return;
+    }
+
+    // 封裝標準 Payload
+    const dbPayload = {
+        dbName: dbName,
+        headers: headers,
+        rows: [], // 空白資料庫預設沒有資料列
+        createdAt: Date.now()
+    };
+
+    // 寫入 IndexedDB
+    await saveData("raw_databases", dbPayload);
+    showToast(`空白資料庫「${dbName}」建立成功！`, true);
+
+    // 關閉手動建立 Modal
+    closeModal("modal-create-db");
+    
+    // 【關鍵修正】只呼叫 refreshDbManageModule 一次，刪除重複的 renderRawDBList()
+    if (typeof refreshDbManageModule === 'function') refreshDbManageModule();
+    if (typeof refreshCardModule === 'function') refreshCardModule();
+}
+
+        /*************************************************************
          * 5. 測驗遊戲模組
          *************************************************************/
         let allCardProjects = [];
@@ -1719,40 +1839,47 @@ function switchStudyCard(step) {
         }
 
         /*************************************************************
-         * 現存資料庫管理 & 手動新增卡片模組
-         *************************************************************/
-        let currentEditingDbName = null;
+ * 現存資料庫管理 & 手動新增卡片模組
+ *************************************************************/
+let currentEditingDbName = null;
 
-        // 保留原函數名作為轉接橋樑
-        async function renderRawDBList() {
-            await refreshDbManageModule();
-        }
+// 保留原函數名作為轉接橋樑
+async function renderRawDBList() {
+    await refreshDbManageModule();
+}
 
-        async function refreshDbManageModule() {
-            const container = document.getElementById("db-list-container");
-            container.innerHTML = "";
+async function refreshDbManageModule() {
+    const container = document.getElementById("db-list-container");
+    if (!container) return;
 
-            const dbs = await getAllData("raw_databases");
-            if (dbs.length === 0) {
-                container.innerHTML = `<div style="text-align:center; color:var(--text-sub); padding:20px;">目前尚無任何原始資料庫</div>`;
-                return;
-            }
+    // 1. 先清空容器
+    container.innerHTML = "";
 
-            dbs.forEach(d => {
-                container.innerHTML += `
-                    <div class="list-item" style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:10px;">
-                        <div>
-                            <div style="font-size:11pt; font-weight:bold; color:#fff;">${d.dbName}</div>
-                            <div style="font-size:8.5pt; color:var(--text-sub); margin-top:4px;">欄位: ${d.headers.join(", ")} | 資料: ${d.rows.length} 筆</div>
-                        </div>
-                        <div style="display:flex; gap:8px;">
-                            <button onclick="openAddCardModal('${d.dbName}')" style="background:rgba(56,189,248,0.2); border:1px solid var(--accent); color:var(--accent); font-size:8.5pt; padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:bold;">＋新增卡片</button>
-                            <button onclick="deleteRawDB('${d.dbName}')" style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; color:#ef4444; font-size:8.5pt; padding:6px 10px; border-radius:6px; cursor:pointer;">刪除</button>
-                        </div>
-                    </div>
-                `;
-            });
-        }
+    const dbs = await getAllData("raw_databases");
+    if (dbs.length === 0) {
+        container.innerHTML = `<div style="text-align:center; color:var(--text-sub); padding:20px;">目前尚無任何原始資料庫</div>`;
+        return;
+    }
+
+    // 2. 採用 HTML 字串一次性拼接，避免 append 過程中的競態與多次 DOM 重繪
+    let htmlContent = "";
+    dbs.forEach(d => {
+        htmlContent += `
+            <div class="list-item" style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:10px;">
+                <div>
+                    <div style="font-size:11pt; font-weight:bold; color:#fff;">${d.dbName}</div>
+                    <div style="font-size:8.5pt; color:var(--text-sub); margin-top:4px;">欄位: ${d.headers.join(", ")} | 資料: ${d.rows.length} 筆</div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button onclick="openAddCardModal('${d.dbName}')" style="background:rgba(56,189,248,0.2); border:1px solid var(--accent); color:var(--accent); font-size:8.5pt; padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:bold;">＋新增卡片</button>
+                    <button onclick="deleteRawDB('${d.dbName}')" style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; color:#ef4444; font-size:8.5pt; padding:6px 10px; border-radius:6px; cursor:pointer;">刪除</button>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = htmlContent;
+}
 
         // 開啟手動新增卡片 Modal
         async function openAddCardModal(dbName) {
@@ -1814,14 +1941,45 @@ function switchStudyCard(step) {
             }
         }
 
-        // 刪除原始資料庫
-        async function deleteRawDB(dbName) {
-            if (confirm(`確定要刪除資料庫【${dbName}】嗎？此動作無法復原！`)) {
-                await deleteData("raw_databases", dbName);
-                showToast("資料庫已成功刪除", true);
-                refreshDbManageModule();
-            }
+        // 刪除原始資料庫 (包含連動刪除歸屬的字卡集 Cascade Delete)
+async function deleteRawDB(dbName) {
+    if (confirm(`⚠️ 警告：確定要刪除資料庫【${dbName}】嗎？\n包含以此資料庫建立的所有「字卡集」也會一併刪除，此動作無法復原！`)) {
+        
+        // 1. 刪除原始資料庫本身
+        await deleteData("raw_databases", dbName);
+
+        // 2. 搜尋並連動刪除所有 sourceDB 等於該 dbName 的字卡集
+        const allProjects = await getAllData("card_projects");
+        const linkedProjects = allProjects.filter(p => p.sourceDB === dbName);
+
+        for (const project of linkedProjects) {
+            await deleteData("card_projects", project.projectName);
         }
+
+        // 3. 提示使用者結果
+        const deletedProjectCount = linkedProjects.length;
+        const msg = deletedProjectCount > 0 
+            ? `已成功刪除資料庫【${dbName}】及對應的 ${deletedProjectCount} 個字卡集！` 
+            : `已成功刪除資料庫【${dbName}】！`;
+        showToast(msg, true);
+
+        // 4. 即時刷新各模組 UI 清單與選單
+        refreshDbManageModule();
+        
+        // 如果建立字卡集的畫面正開啟著，同步刷新它的清單與下拉選單
+        if (typeof refreshCardModule === 'function') {
+            refreshCardModule();
+        }
+
+        // 如果學習區/測驗區正在開著，也可以補充刷新對應選單
+        if (typeof refreshStudyModule === 'function') {
+            refreshStudyModule();
+        }
+        if (typeof refreshQuizModule === 'function') {
+            refreshQuizModule();
+        }
+    }
+}
 
         async function updateStorageEstimate() {
             if (navigator.storage && navigator.storage.estimate) {
