@@ -6,474 +6,626 @@
     <title>極致高質感字卡系統 - 完整版</title>
     <!-- 引入 SheetJS 用於解析 Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <!-- PWA Manifest 連結 -->
+<link rel="manifest" href="./manifest.json">
+
+<!-- 💡 iOS 專屬 PWA 必備標籤 -->
+<!-- 1. 允許全螢幕（隱藏 Safari 網址列與底欄） -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- 2. 設定 iOS 狀態列顏色 (black-translucent 可沉浸式頂部) -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- 3. iOS 主畫面圖示標籤 (直接使用你的 GitHub 圖片網址) -->
+<link rel="apple-touch-icon" href="https://raw.githubusercontent.com/paulie0102-Bear/studycard/refs/heads/main/paw.png">
+<!-- 4. 設定 iOS 主畫面顯示名稱 -->
+<meta name="apple-mobile-web-app-title" content="SmartCards">
+
+<!-- Android / Chrome 標籤 -->
+<meta name="theme-color" content="#0f172a">
     <style>
-        /* CSS 變數定義 */
-        :root {
-            --bg-main: #0f172a;
-            --bg-card: rgba(30, 41, 59, 0.7);
-            --bg-modal: #1e293b;
-            --accent: #38bdf8;
-            --text-main: #f8fafc;
-            --text-sub: #94a3b8;
-            --border: rgba(255, 255, 255, 0.1);
-            --safe-bottom: env(safe-area-inset-bottom, 0px);
-            --safe-top: env(safe-area-inset-top, 0px);
-        }
+    /* CSS 變數定義 */
+    :root {
+        --bg-main: #0f172a;
+        --bg-card: rgba(30, 41, 59, 0.7);
+        --bg-modal: #1e293b;
+        --accent: #38bdf8;
+        --text-main: #f8fafc;
+        --text-sub: #94a3b8;
+        --border: rgba(255, 255, 255, 0.1);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-top: env(safe-area-inset-top, 0px);
+    }
 
-        /* 全域重設，啟用 border-box 防止溢出 */
-        *, *::before, *::after {
-            box-sizing: border-box;
-            -webkit-user-select: none;
-            user-select: none;
-        }
+    /* 全域重設 */
+    *, *::before, *::after {
+        box-sizing: border-box;
+        -webkit-user-select: none;
+        user-select: none;
+    }
 
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-main);
-            color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            height: 100svh;
-            overflow: hidden;
-            display: block;
-        }
+    body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        min-height: 100svh;
+        overflow-x: hidden;
+    }
 
-        /* 主畫面佈局 */
-        .home-container {
-            height: 100svh;
-            padding: calc(var(--safe-top) + 30px) 20px calc(var(--safe-bottom) + 30px) 20px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            align-items: center;
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-        }
+    /* 主畫面佈局 */
+    .home-container {
+        min-height: 100svh;
+        height: auto;
+        /* 增加頂部間距，降低壓迫感 */
+        padding: calc(var(--safe-top) + 32px) 20px calc(var(--safe-bottom) + 30px) 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 24px;
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 
-        .header-section {
-            text-align: center;
-            width: 100%;
-        }
+    /* Header 與熊掌浮水印 */
+    .header-section {
+        position: relative;
+        overflow: hidden;
+        padding: 24px 20px 12px 20px; /* 增加上方留白 */
+        text-align: center;
+        width: 100%;
+    }
 
-        .header-section h1 {
-            font-size: 24pt;
-            margin: 0 0 10px 0;
-            letter-spacing: 2px;
-            background: linear-gradient(to right, #38bdf8, #818cf8);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+    .watermark-svg {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-12deg); 
+        width: 220px;
+        height: 220px;
+        color: rgba(224, 242, 254, 0.08); 
+        pointer-events: none;
+        user-select: none;
+        z-index: 0;
+    }
 
-        .header-section p {
-            color: var(--text-sub);
-            font-size: 11pt;
-            margin: 0;
-        }
+    .header-section h1 {
+        position: relative;
+        z-index: 1;
+        font-size: 24pt;
+        margin: 0 0 10px 0;
+        letter-spacing: 2px;
+        background: linear-gradient(to right, #38bdf8, #818cf8);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
 
-        .menu-buttons {
-            width: 100%;
-            max-width: 400px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
+    .header-section p {
+        position: relative;
+        z-index: 1;
+        color: var(--text-sub);
+        font-size: 11pt;
+        margin: 0;
+    }
 
-        /* 有質感的橫式按鈕 */
-        .nav-btn {
-            width: 100%;
-            padding: 16px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            color: var(--text-main);
-            font-size: 12pt;
-            font-weight: 600;
-            letter-spacing: 1px;
-            cursor: pointer;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            transition: transform 0.2s, background-color 0.2s;
-            text-align: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
+    /* 主選單按鈕 */
+    .menu-buttons {
+        width: 100%;
+        max-width: 400px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: 10px 0;
+    }
 
-        .nav-btn:active {
-            transform: scale(0.97);
-            background: rgba(255, 255, 255, 0.1);
-        }
+    .nav-btn {
+        width: 100%;
+        padding: 16px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        color: var(--text-main);
+        font-size: 12pt;
+        font-weight: 600;
+        letter-spacing: 1px;
+        cursor: pointer;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        transition: transform 0.2s, background-color 0.2s;
+        text-align: center;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
 
-        /* 全螢幕遮罩層層級 */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100svh;
-            background-color: var(--bg-modal);
-            z-index: 100;
-            display: none;
-            flex-direction: column;
-            padding-top: var(--safe-top);
-            padding-bottom: var(--safe-bottom);
-        }
+    .nav-btn:active {
+        transform: scale(0.97);
+        background: rgba(255, 255, 255, 0.1);
+    }
 
-        /* 遮罩頂部導覽列，固定不動 */
-        .modal-header {
-            height: 60px;
-            min-height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-            border-bottom: 1px solid var(--border);
-            background: var(--bg-modal);
-        }
+    /* Modal 全螢幕遮罩 - 增加頂部安全留白 */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100svh;
+        background-color: var(--bg-modal);
+        z-index: 100;
+        display: none;
+        flex-direction: column;
+        /* 將安全區域 + 額外留白，解除貼頂壓迫感 */
+        padding-top: calc(var(--safe-top) + 12px);
+        padding-bottom: var(--safe-bottom);
+    }
 
-        .modal-title {
-            font-size: 13pt;
-            font-weight: bold;
-        }
+    .modal-header {
+        height: 64px;
+        min-height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-modal);
+    }
 
-        /* 返回按鈕樣式，徹底避開邊緣防止誤觸 */
-        .back-btn {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid var(--border);
-            color: var(--text-main);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 10.5pt;
-            cursor: pointer;
-        }
-        .back-btn:active { background: rgba(255, 255, 255, 0.2); }
+    .modal-title {
+        font-size: 13pt;
+        font-weight: bold;
+    }
 
-        /* 遮罩內容滾動區：關鍵防網頁下拉重整設定 */
-        .modal-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            overscroll-behavior-y: contain; /* 隔離重整手勢 */
-            -webkit-overflow-scrolling: touch;
-        }
+    .back-btn {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--border);
+        color: var(--text-main);
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 10.5pt;
+        cursor: pointer;
+    }
+    .back-btn:active { background: rgba(255, 255, 255, 0.2); }
 
-        /* 表單與操作元件群組 */
-        .form-group {
-            margin-bottom: 24px;
-        }
-        .form-group label {
-            display: block;
-            font-size: 11pt;
-            color: var(--text-sub);
-            margin-bottom: 8px;
-        }
-        .input-text {
-            width: 100%;
-            padding: 12px;
-            background: rgba(0,0,0,0.2);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: #fff;
-            font-size: 11pt;
-        }
-        .input-text:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
+    /* Modal 內容區 - 頂部 Padding 加大 */
+    .modal-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 28px 20px 24px 20px; /* 頂部調大至 28px */
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+    }
 
-        /* 欄位勾選網格 */
-        .checkbox-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-top: 8px;
-        }
-        .check-item {
-            background: rgba(255,255,255,0.04);
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 11pt;
-        }
-        .check-item input[type="checkbox"], .check-item input[type="radio"] {
-            width: 18px;
-            height: 18px;
-        }
+    /* 表單元件 */
+    .form-group { margin-bottom: 24px; }
+    .form-group label {
+        display: block;
+        font-size: 11pt;
+        color: var(--text-sub);
+        margin-bottom: 8px;
+    }
+    .input-text {
+        width: 100%;
+        padding: 12px;
+        background: rgba(0,0,0,0.2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: #fff;
+        font-size: 11pt;
+    }
+    .input-text:focus {
+        outline: none;
+        border-color: var(--accent);
+    }
 
-        /* 顏色選擇網格 */
-        .color-pick-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: rgba(255,255,255,0.02);
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            border: 1px solid var(--border);
-        }
-        .color-picker {
-            border: none;
-            background: transparent;
-            width: 40px;
-            height: 30px;
-            cursor: pointer;
-        }
+    .checkbox-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-top: 8px;
+    }
+    .check-item {
+        background: rgba(255,255,255,0.04);
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11pt;
+    }
+    .check-item input[type="checkbox"], .check-item input[type="radio"] {
+        width: 18px;
+        height: 18px;
+    }
 
-        /* 動態拉伸字卡樣式 */
-        .flashcard-preview-container {
-            display: flex;
-            justify-content: center;
-            margin: 20px 0;
-        }
-        .flashcard {
-            width: 100%;
-            max-width: 320px;
-            min-height: 180px; /* 最小高度 */
-            height: auto;      /* 隨內容動態拉伸 */
-            background: #1e293b;
-            border-radius: 20px;
-            border: 4px solid #64748b; /* 預設顏色 */
-            padding: 24px;
-            position: relative;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            transition: border-color 0.3s, transform 0.2s;
-        }
-        .flashcard:active {
-            transform: scale(0.99);
-        }
-        .card-badge {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 9pt;
-            font-weight: bold;
-            color: #fff;
-        }
-        .card-side-indicator {
-            font-size: 9pt;
-            color: var(--text-sub);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 10px;
-        }
-        .card-main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            justify-content: center;
-        }
-        .card-field-block {
-            margin: 4px 0;
-        }
-        .card-field-title {
-            font-size: 9pt;
-            color: var(--text-sub);
-            margin-bottom: 2px;
-        }
-        .card-field-value {
-            font-size: 13pt;
-            font-weight: 500;
-            color: #fff;
-            word-break: break-all;
-            -webkit-user-select: text;
-            user-select: text;
-        }
+    .color-pick-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: rgba(255,255,255,0.02);
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        border: 1px solid var(--border);
+    }
+    .color-picker {
+        border: none;
+        background: transparent;
+        width: 40px;
+        height: 30px;
+        cursor: pointer;
+    }
 
-        /* 雙按鈕控制列（用於學習區切換） */
-        .card-controls {
-            display: flex;
-            gap: 16px;
-            width: 100%;
-            max-width: 320px;
-            margin: 0 auto;
-        }
-        .control-btn {
-            flex: 1;
-            padding: 12px;
-            background: rgba(255,255,255,0.08);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            color: white;
-            font-size: 11pt;
-            cursor: pointer;
-            text-align: center;
-        }
-        .control-btn:active { background: rgba(255,255,255,0.2); }
+    /* 字卡與控制項 */
+    .flashcard-preview-container {
+        display: flex;
+        justify-content: center;
+        margin: 20px 0;
+    }
+    .flashcard {
+        width: 100%;
+        max-width: 320px;
+        min-height: 180px;
+        height: auto;
+        background: #1e293b;
+        border-radius: 20px;
+        border: 4px solid #64748b;
+        padding: 24px;
+        position: relative;
+        box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: border-color 0.3s, transform 0.2s;
+    }
+    .flashcard:active { transform: scale(0.99); }
 
-        /* 儲存按鈕 */
-        .action-btn {
-            width: 100%;
-            padding: 14px;
-            background: #0284c7;
-            border: none;
-            border-radius: 10px;
-            color: #fff;
-            font-size: 12pt;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 15px;
-        }
-        .action-btn:active { background: #0369a1; }
+    .card-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 9pt;
+        font-weight: bold;
+        color: #fff;
+    }
+    .card-side-indicator {
+        font-size: 9pt;
+        color: var(--text-sub);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 10px;
+    }
+    .card-main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        justify-content: center;
+    }
+    .card-field-block { margin: 4px 0; }
+    .card-field-title {
+        font-size: 9pt;
+        color: var(--text-sub);
+        margin-bottom: 2px;
+    }
+    .card-field-value {
+        font-size: 13pt;
+        font-weight: 500;
+        color: #fff;
+        word-break: break-all;
+        -webkit-user-select: text;
+        user-select: text;
+    }
 
-        /* 列表樣式 */
-        .item-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .list-item {
-            background: rgba(255,255,255,0.04);
-            padding: 14px;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    .card-controls {
+        display: flex;
+        gap: 16px;
+        width: 100%;
+        max-width: 320px;
+        margin: 0 auto;
+    }
+    .control-btn {
+        flex: 1;
+        padding: 12px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: white;
+        font-size: 11pt;
+        cursor: pointer;
+        text-align: center;
+    }
+    .control-btn:active { background: rgba(255,255,255,0.2); }
 
-        /* 測驗模組特殊樣式 */
-        .quiz-intro, .quiz-playground, .quiz-result-view {
-            display: none;
-        }
-        .quiz-options {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-top: 20px;
-        }
-        .option-btn {
-            width: 100%;
-            padding: 16px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            color: #fff;
-            font-size: 11pt;
-            text-align: left;
-            cursor: pointer;
-        }
-        .option-btn:active { background: rgba(255,255,255,0.15); }
-        
-        /* 答題即時反饋全螢幕遮罩 */
-        .feedback-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100svh;
-            z-index: 999;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 90pt;
-            font-weight: bold;
-        }
-        .feedback-o { background: rgba(22, 163, 74, 0.9); color: white; }
-        .feedback-x { background: rgba(220, 38, 38, 0.9); color: white; }
+    .action-btn {
+        width: 100%;
+        padding: 14px;
+        background: #0284c7;
+        border: none;
+        border-radius: 10px;
+        color: #fff;
+        font-size: 12pt;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 15px;
+    }
+    .action-btn:active { background: #0369a1; }
 
-        /* 進度條樣式 */
-        .progress-container {
-            width: 100%;
-            background: rgba(255,255,255,0.1);
-            height: 12px;
-            border-radius: 6px;
-            overflow: hidden;
-            margin-top: 6px;
-        }
-        .progress-bar {
-            height: 100%;
-            width: 0%;
-            background: var(--accent);
-            transition: width 0.3s;
-        }
+    .item-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .list-item {
+        background: rgba(255,255,255,0.04);
+        padding: 14px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
 
-        /* 精美提示通知彈窗 (Toast) */
-        .toast {
-            position: fixed;
-            bottom: calc(var(--safe-bottom) + 30px);
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: #ef4444;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 30px;
-            z-index: 1000;
-            font-weight: bold;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
-            transition: transform 0.3s ease;
-            white-space: nowrap;
-            display: block;
-            opacity: 0;
-            pointer-events: none;
-        }
-        .toast.show {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
-        }
-        .toast.success { background: #10b981; }
-    </style>
+    /* 測驗模組 */
+    .quiz-intro, .quiz-playground, .quiz-result-view { display: none; }
+    .quiz-options {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 20px;
+    }
+    .option-btn {
+        width: 100%;
+        padding: 16px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        color: #fff;
+        font-size: 11pt;
+        text-align: left;
+        cursor: pointer;
+    }
+    .option-btn:active { background: rgba(255,255,255,0.15); }
+    
+    .feedback-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100svh;
+        z-index: 999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        font-size: 90pt;
+        font-weight: bold;
+    }
+    .feedback-o { background: rgba(22, 163, 74, 0.9); color: white; }
+    .feedback-x { background: rgba(220, 38, 38, 0.9); color: white; }
+
+    .progress-container {
+        width: 100%;
+        background: rgba(255,255,255,0.1);
+        height: 12px;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-top: 6px;
+    }
+    .progress-bar {
+        height: 100%;
+        width: 0%;
+        background: var(--accent);
+        transition: width 0.3s;
+    }
+
+    .toast {
+        position: fixed;
+        bottom: calc(var(--safe-bottom) + 30px);
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: #ef4444;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 30px;
+        z-index: 1000;
+        font-weight: bold;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+        transition: transform 0.3s ease;
+        white-space: nowrap;
+        display: block;
+        opacity: 0;
+        pointer-events: none;
+    }
+    .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+    .toast.success { background: #10b981; }
+
+    /* 💡 Footer 可點擊展開免責聲明樣式 */
+    .app-footer {
+        width: 100%;
+        max-width: 400px;
+        margin-top: auto;
+        padding: 16px 10px;
+        text-align: center;
+        flex-shrink: 0;
+    }
+
+    .disclaimer-details {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px 14px;
+        transition: background-color 0.2s;
+    }
+
+    .disclaimer-summary {
+        font-size: 0.82rem;
+        color: var(--text-sub);
+        cursor: pointer;
+        list-style: none; /* 移除預設箭頭 */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .disclaimer-summary::-webkit-details-marker {
+        display: none; /* Safari 隱藏預設箭頭 */
+    }
+
+    .disclaimer-details[open] .disclaimer-summary .arrow {
+        transform: rotate(180deg);
+    }
+
+    .disclaimer-text {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 0.78rem;
+        color: var(--text-sub);
+        line-height: 1.6;
+        text-align: left;
+        opacity: 0.85;
+    }
+</style>
 </head>
 <body>
 
     <!-- 主畫面結構 -->
     <div class="home-container">
         <div class="header-section">
-            <h1>SMART CARDS</h1>
-            <p>高質感全自由度學習字卡系統</p>
-        </div>
+    <!-- 手繪帶指甲熊掌 SVG 浮水印 -->
+    <svg class="watermark-svg" viewBox="0 0 200 200" fill="currentColor">
+        <!-- 5根手指 + 銳利彎曲鉤爪(指甲) -->
+        <!-- 第 1 指 (最左小指) -->
+        <path d="M 28 82 Q 22 68 18 50 Q 25 52 30 62 Q 38 78 32 85 Z" />
+        <ellipse cx="38" cy="90" rx="9" ry="13" transform="rotate(-30 38 90)" />
+
+        <!-- 第 2 指 -->
+        <path d="M 58 55 Q 56 38 52 20 Q 60 25 64 38 Q 70 56 63 62 Z" />
+        <ellipse cx="68" cy="68" rx="10" ry="15" transform="rotate(-15 68 68)" />
+
+        <!-- 第 3 指 (中指 - 最長) -->
+        <path d="M 98 42 Q 98 22 96 5 Q 104 12 106 28 Q 110 46 102 50 Z" />
+        <ellipse cx="103" cy="58" rx="11" ry="16" />
+
+        <!-- 第 4 指 -->
+        <path d="M 138 55 Q 140 38 144 20 Q 136 25 132 38 Q 126 56 133 62 Z" />
+        <ellipse cx="138" cy="68" rx="10" ry="15" transform="rotate(15 138 68)" />
+
+        <!-- 第 5 指 (最右大拇指) -->
+        <path d="M 168 82 Q 174 68 178 50 Q 171 52 166 62 Q 158 78 164 85 Z" />
+        <ellipse cx="168" cy="90" rx="9" ry="13" transform="rotate(30 168 90)" />
+
+        <!-- 下方巨大厚實掌墊 (帶有手繪微不規則弧度) -->
+        <path d="M 45 125 C 40 105, 80 100, 103 102 C 126 100, 166 105, 161 125 C 156 155, 138 175, 103 175 C 68 175, 50 155, 45 125 Z" />
+    </svg>
+
+    <h1>SMART CARDS</h1>
+    <p>全自由度學習字卡系統</p>
+</div>
 
         <div class="menu-buttons">
-            <button class="nav-btn" onclick="openModal('modal-study')">學習區 (觀看卡片)</button>
-            <button class="nav-btn" onclick="openModal('modal-cards')" style="background:rgba(56,189,248,0.15); border-color:rgba(56,189,248,0.3);">建立字卡</button>
-            <button class="nav-btn" onclick="openModal('modal-quiz')">測驗</button>
-            <button class="nav-btn" onclick="openModal('modal-db')">資料庫</button>
-            <button class="nav-btn" onclick="openModal('modal-import')">匯入 EXCEL</button>
-            <button class="nav-btn" onclick="openModal('modal-settings')">設定</button>
+    <button class="nav-btn" onclick="openModal('modal-study')">學習區 (觀看卡片)</button>
+    <button class="nav-btn" onclick="openModal('modal-cards')" style="background:rgba(56,189,248,0.15); border-color:rgba(56,189,248,0.3);">建立字卡</button>
+    <button class="nav-btn" onclick="openModal('modal-quiz')">測驗</button>
+    <button class="nav-btn" onclick="openModal('modal-db')">資料庫</button>
+    <button class="nav-btn" onclick="openModal('modal-import')">匯入 EXCEL</button>
+    <button class="nav-btn" onclick="openModal('modal-settings')">設定</button>
+</div>
+
+<div style="font-size:9pt; color:var(--text-sub);">Powered by IndexedDB & SheetJS</div>
+
+<!-- 📌 改良版：折疊式免責聲明頁尾 -->
+<footer class="app-footer">
+    <details class="disclaimer-details">
+        <summary class="disclaimer-summary">
+            <span>SMART CARDS 免責聲明與說明</span>
+            <span class="arrow">▾</span>
+        </summary>
+        
+        <div class="disclaimer-text">
+            <p style="margin: 4px 0;"><strong>1. 資料儲存：</strong>本系統為純前端架構，所有字卡僅儲存於您的本機瀏覽器（Local Storage / IndexedDB）中，請定期備份。</p>
+            <p style="margin: 4px 0;"><strong>2. 內容責任：</strong>使用者自訂或匯入之內容版權歸原創者所有，本系統對內容正確性與合法性不負擔保責任。</p>
+            <p style="margin: 4px 0;"><strong>3. 服務說明：</strong>本工具僅供個人輔助學習使用。</p>
         </div>
-        <div style="font-size:9pt; color:var(--text-sub);">Powered by IndexedDB & SheetJS</div>
+    </details>
+
+    <p style="margin-top: 10px; font-size: 0.75rem; opacity: 0.5;">
+        Designed for better learning. © 2026
+    </p>
+</footer>
+
+</div> <!-- home-container 的關閉標籤 -->
+
+    <!-- 0. 學習區模組遮罩 (支援排序、拖曳重排、筆記功能) -->
+<div id="modal-study" class="modal-overlay">
+    <div class="modal-header">
+        <span class="modal-title">卡片學習核心區</span>
+        <button class="back-btn" onclick="closeModal('modal-study')">返回</button>
     </div>
-
-    <!-- 0. 新增：學習區模組遮罩 -->
-    <div id="modal-study" class="modal-overlay">
-        <div class="modal-header">
-            <span class="modal-title">卡片學習核心區</span>
-            <button class="back-btn" onclick="closeModal('modal-study')">返回</button>
+    <div class="modal-content">
+        <div class="form-group">
+            <label>選擇欲學習的字卡集</label>
+            <select id="study-project-select" class="input-text" onchange="onStudyProjectSelect()">
+                <option value="">-- 請選擇字卡集 --</option>
+            </select>
         </div>
-        <div class="modal-content">
-            <div class="form-group">
-                <label>選擇欲學習的字卡集</label>
-                <select id="study-project-select" class="input-text" onchange="onStudyProjectSelect()">
-                    <option value="">-- 請選擇字卡集 --</option>
-                </select>
-            </div>
 
-            <!-- 學習卡片戰場（有資料時才呈現） -->
-            <div id="study-playground" style="display:none; margin-top:20px;">
-                <div style="text-align:center; font-size:10pt; color:var(--text-sub);" id="study-index-text">卡片位置: 0 / 0</div>
-                
-                <div class="flashcard-preview-container">
-                    <div class="flashcard" id="study-card" onclick="flipStudyCard()">
-                        <div class="card-badge" id="study-card-badge">分類</div>
-                        <div>
-                            <div class="card-side-indicator" id="study-card-side">正面</div>
-                            <div class="card-main-content" id="study-card-main"></div>
-                        </div>
+        <!-- 第一階段：卡片總覽列表 (ListView + 分類與字母排序) -->
+<div id="study-list-view" style="display:none; margin-top:20px;">
+    <!-- 排序與控制工具列 -->
+    <div style="background:rgba(255,255,255,0.05); padding:10px 12px; border-radius:8px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between;">
+        <span id="study-progress-badge" style="font-size:9.5pt; color:var(--accent); font-weight:bold;"></span>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button onclick="sortStudyCards('az')" style="background:rgba(255,255,255,0.1); border:1px solid var(--border); color:#fff; font-size:8.5pt; padding:4px 8px; border-radius:4px; cursor:pointer;">A → Z</button>
+            <button onclick="sortStudyCards('za')" style="background:rgba(255,255,255,0.1); border:1px solid var(--border); color:#fff; font-size:8.5pt; padding:4px 8px; border-radius:4px; cursor:pointer;">Z → A</button>
+            <button onclick="sortStudyCards('class-az')" style="background:rgba(255,255,255,0.1); border:1px solid var(--border); color:#fff; font-size:8.5pt; padding:4px 8px; border-radius:4px; cursor:pointer;">分類 + 正序</button>
+            <button onclick="sortStudyCards('class-za')" style="background:rgba(255,255,255,0.1); border:1px solid var(--border); color:#fff; font-size:8.5pt; padding:4px 8px; border-radius:4px; cursor:pointer;">分類 + 倒序</button>
+        </div>
+    </div>
+    
+    <div style="font-size:8.5pt; color:var(--text-sub); margin-bottom:8px; text-align:right;">💡 提示：點擊卡片可查看詳細，點擊右側「刪除」可移除該卡片</div>
+
+    <div id="study-items-container" class="item-list"></div>
+</div>
+
+        <!-- 第二階段：單張卡片檢視 (CardView + 個人筆記) -->
+        <div id="study-card-view" style="display:none; margin-top:15px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <button class="back-btn" onclick="backToStudyList()" style="background:rgba(56,189,248,0.15); border-color:var(--accent); color:var(--accent);">← 返回卡片列表</button>
+                <span style="font-size:10pt; color:var(--text-sub);" id="study-index-text">卡片位置: 0 / 0</span>
+            </div>
+            
+            <div class="flashcard-preview-container">
+                <div class="flashcard" id="study-card" onclick="flipStudyCard()">
+                    <div class="card-badge" id="study-card-badge">分類</div>
+                    <div>
+                        <div class="card-side-indicator" id="study-card-side">正面</div>
+                        <div class="card-main-content" id="study-card-main"></div>
                     </div>
                 </div>
+            </div>
 
-                <!-- 控制切換按鈕 -->
-                <div class="card-controls">
-                    <button class="control-btn" onclick="switchStudyCard(-1)">上一張</button>
-                    <button class="control-btn" onclick="switchStudyCard(1)" style="background:var(--accent); color:#0f172a; font-weight:bold;">下一張</button>
+            <!-- 控制切換按鈕 -->
+            <div class="card-controls" style="margin-bottom:15px;">
+                <button class="control-btn" onclick="switchStudyCard(-1)">上一張</button>
+                <button class="control-btn" onclick="switchStudyCard(1)" style="background:var(--accent); color:#0f172a; font-weight:bold;">下一張</button>
+            </div>
+
+            <!-- 個人筆記區塊 -->
+            <div style="background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:10px; padding:12px; margin-top:10px;">
+                <div style="font-size:9.5pt; color:var(--accent); font-weight:bold; margin-bottom:6px; display:flex; justify-content:space-between;">
+                    <span>📝 個人學習筆記</span>
+                    <span id="note-saved-hint" style="font-weight:normal; color:#10b981; opacity:0; transition:opacity 0.3s;">已自動儲存</span>
                 </div>
+                <textarea id="study-card-note" class="input-text" style="width:100%; height:80px; resize:vertical; font-size:9.5pt; line-height:1.4;" placeholder="在這裡寫下這張卡片的重點、補充筆記..." oninput="saveCardNote()"></textarea>
             </div>
         </div>
     </div>
+</div>
 
     <!-- 1. 建立字卡模組遮罩 -->
     <div id="modal-cards" class="modal-overlay">
@@ -586,16 +738,28 @@
         </div>
     </div>
 
-    <!-- 3. 資料庫模組遮罩 -->
-    <div id="modal-db" class="modal-overlay">
-        <div class="modal-header">
-            <span class="modal-title">現存原始資料庫</span>
-            <button class="back-btn" onclick="closeModal('modal-db')">返回</button>
-        </div>
-        <div class="modal-content">
-            <div id="db-list-container" class="item-list"></div>
-        </div>
+    <!-- 3. 資料庫模組遮罩 (新增：手動新增卡片按鈕) -->
+<div id="modal-db" class="modal-overlay">
+    <div class="modal-header">
+        <span class="modal-title">現存原始資料庫</span>
+        <button class="back-btn" onclick="closeModal('modal-db')">返回</button>
     </div>
+    <div class="modal-content">
+        <div id="db-list-container" class="item-list"></div>
+    </div>
+</div>
+
+<!-- 3.5 新增：手動新增卡片彈窗遮罩 -->
+<div id="modal-add-card" class="modal-overlay">
+    <div class="modal-header">
+        <span class="modal-title" id="add-card-modal-title">手動新增卡片</span>
+        <button class="back-btn" onclick="closeModal('modal-add-card')">取消</button>
+    </div>
+    <div class="modal-content">
+        <div id="add-card-form-fields"></div>
+        <button class="control-btn" onclick="submitNewCard()" style="background:var(--accent); color:#0f172a; font-weight:bold; width:100%; margin-top:15px; padding:12px;">儲存並新增</button>
+    </div>
+</div>
 
     <!-- 4. 匯入 EXCEL 模組遮罩 -->
     <div id="modal-import" class="modal-overlay">
@@ -738,111 +902,298 @@
         }
 
         /*************************************************************
-         * 3. 新增功能：學習區模組 (觀看、手動切換、點擊翻面)
-         *************************************************************/
-        let studyProjects = [];
-        let curStudyProject = null;
-        let curStudyDB = null;
-        let curStudyIndex = 0;
-        let curStudyIsBack = false;
+        /*************************************************************
+ * 3. 學習區模組 (支援分類/文字排序、刪除卡片、記憶進度、筆記儲存)
+ *************************************************************/
+let studyProjects = [];
+let curStudyProject = null;
+let curStudyDB = null;
+let curStudyIndex = 0;
+let curStudyIsBack = false;
 
-        async function refreshStudyModule() {
-            const select = document.getElementById("study-project-select");
-            select.innerHTML = `<option value="">-- 請選擇字卡集 --</option>`;
-            document.getElementById("study-playground").style.display = "none";
+async function refreshStudyModule() {
+    const select = document.getElementById("study-project-select");
+    select.innerHTML = `<option value="">-- 請選擇字卡集 --</option>`;
+    document.getElementById("study-list-view").style.display = "none";
+    document.getElementById("study-card-view").style.display = "none";
 
-            studyProjects = await getAllData("card_projects");
-            studyProjects.forEach(p => {
-                select.innerHTML += `<option value="${p.projectName}">${p.projectName}</option>`;
-            });
+    studyProjects = await getAllData("card_projects");
+    studyProjects.forEach(p => {
+        select.innerHTML += `<option value="${p.projectName}">${p.projectName}</option>`;
+    });
+}
+
+async function onStudyProjectSelect() {
+    const pName = document.getElementById("study-project-select").value;
+    const listView = document.getElementById("study-list-view");
+    const cardView = document.getElementById("study-card-view");
+
+    if (!pName) {
+        listView.style.display = "none";
+        cardView.style.display = "none";
+        return;
+    }
+
+    curStudyProject = studyProjects.find(p => p.projectName === pName);
+    const dbs = await getAllData("raw_databases");
+    curStudyDB = dbs.find(d => d.dbName === curStudyProject.sourceDB);
+
+    if (!curStudyDB || curStudyDB.rows.length === 0) {
+        showToast("防呆：該項目原始資料庫不存在或無數據！", false);
+        listView.style.display = "none";
+        cardView.style.display = "none";
+        return;
+    }
+
+    cardView.style.display = "none";
+    listView.style.display = "block";
+    renderStudyListView();
+}
+
+// 取得該字卡集上次記憶的閱讀位置
+function getLastStudyIndex() {
+    if (!curStudyProject) return -1;
+    const saved = localStorage.getItem(`study_last_idx_${curStudyProject.projectName}`);
+    return saved !== null ? parseInt(saved, 10) : -1;
+}
+
+// 儲存當前閱讀位置至本地
+function saveLastStudyIndex(index) {
+    if (!curStudyProject) return;
+    localStorage.setItem(`study_last_idx_${curStudyProject.projectName}`, index);
+}
+
+// 渲染列表檢視 (包含刪除按鈕與直覺點擊開啟)
+function renderStudyListView() {
+    const container = document.getElementById("study-items-container");
+    const badge = document.getElementById("study-progress-badge");
+    container.innerHTML = "";
+
+    const lastIdx = getLastStudyIndex();
+    if (lastIdx >= 0 && lastIdx < curStudyDB.rows.length) {
+        badge.innerText = `上次學習到第 ${lastIdx + 1} 項 (共 ${curStudyDB.rows.length} 項)`;
+    } else {
+        badge.innerText = `共 ${curStudyDB.rows.length} 項`;
+    }
+
+    const firstFrontField = curStudyProject.frontFields[0] || "";
+
+    curStudyDB.rows.forEach((row, idx) => {
+        const isLastRead = (idx === lastIdx);
+        const mainTitle = row[firstFrontField] || `卡片 #${idx + 1}`;
+
+        let classTagHtml = "";
+        const classField = curStudyProject.classField;
+        if (classField !== "__none__" && row[classField]) {
+            const classVal = String(row[classField]).trim();
+            const color = curStudyProject.colorMap[classVal] || "#64748b";
+            classTagHtml = `<span style="font-size:8.5pt; padding:2px 8px; border-radius:10px; background:${color}; color:#fff; font-weight:bold; margin-left:8px;">${classVal}</span>`;
         }
 
-        async function onStudyProjectSelect() {
-            const pName = document.getElementById("study-project-select").value;
-            const playground = document.getElementById("study-playground");
+        const itemStyle = isLastRead 
+            ? "background:rgba(56,189,248,0.15); border:1px solid var(--accent);" 
+            : "background:rgba(255,255,255,0.04); border:1px solid var(--border);";
 
-            if (!pName) {
-                playground.style.display = "none";
+        const lastMarkerHtml = isLastRead 
+            ? `<div style="font-size:8.5pt; color:var(--accent); font-weight:bold; margin-top:4px;">📍 上次學習到這裡</div>` 
+            : "";
+
+        const itemEl = document.createElement("div");
+        itemEl.className = "list-item";
+        itemEl.style.cssText = `${itemStyle} cursor:pointer; margin-bottom:8px; padding:10px 14px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; transition: all 0.15s ease;`;
+        
+        itemEl.innerHTML = `
+            <div style="flex:1; margin-right:12px;">
+                <div style="font-size:10.5pt; font-weight:600; color:#fff; display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
+                    <span>#${idx + 1}. ${mainTitle}</span>
+                    ${classTagHtml}
+                </div>
+                ${lastMarkerHtml}
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <button title="刪除這張卡片" class="delete-btn-${idx}" style="background:rgba(239,68,68,0.2); color:#f87171; border:1px solid rgba(239,68,68,0.4); padding:4px 8px; border-radius:6px; font-size:8.5pt; cursor:pointer;">刪除</button>
+                <div style="font-size:12pt; color:var(--text-sub);">›</div>
+            </div>
+        `;
+
+        // 點擊區域：排除刪除按鈕後點擊卡片開啟詳細視窗
+        itemEl.onclick = (e) => {
+            if (e.target.classList.contains(`delete-btn-${idx}`)) {
+                e.stopPropagation();
+                deleteStudyCard(idx);
                 return;
             }
+            openCardViewAt(idx);
+        };
 
-            curStudyProject = studyProjects.find(p => p.projectName === pName);
-            const dbs = await getAllData("raw_databases");
-            curStudyDB = dbs.find(d => d.dbName === curStudyProject.sourceDB);
+        container.appendChild(itemEl);
+    });
+}
 
-            if (!curStudyDB || curStudyDB.rows.length === 0) {
-                showToast("防呆：該項目原始資料庫不存在或無數據！", false);
-                playground.style.display = "none";
-                return;
-            }
+// 刪除指定卡片
+async function deleteStudyCard(index) {
+    if (!curStudyDB || index < 0 || index >= curStudyDB.rows.length) return;
+    
+    const firstFrontField = curStudyProject.frontFields[0] || "";
+    const cardTitle = curStudyDB.rows[index][firstFrontField] || `#${index + 1}`;
 
-            curStudyIndex = 0;
-            curStudyIsBack = false;
-            playground.style.display = "block";
-            renderStudyCard();
+    if (confirm(`確定要刪除卡片「${cardTitle}」嗎？此動作無法復原。`)) {
+        curStudyDB.rows.splice(index, 1);
+        await saveData("raw_databases", curStudyDB);
+        
+        // 修正記憶進度標籤
+        const lastIdx = getLastStudyIndex();
+        if (lastIdx === index) {
+            localStorage.removeItem(`study_last_idx_${curStudyProject.projectName}`);
+        } else if (lastIdx > index) {
+            saveLastStudyIndex(lastIdx - 1);
         }
 
-        function renderStudyCard() {
-            if (!curStudyDB || curStudyDB.rows.length === 0) return;
+        renderStudyListView();
+        showToast("卡片已順利刪除！", true);
+    }
+}
 
-            const rowData = curStudyDB.rows[curStudyIndex];
-            document.getElementById("study-index-text").innerText = `卡片位置: ${curStudyIndex + 1} / ${curStudyDB.rows.length}`;
+// 排序功能 (支援 A-Z, Z-A 以及依照外框/分類優先排序)
+function sortStudyCards(type) {
+    if (!curStudyDB || curStudyDB.rows.length === 0) return;
 
-            const badge = document.getElementById("study-card-badge");
-            const sideText = document.getElementById("study-card-side");
-            const mainContent = document.getElementById("study-card-main");
-            const cardElement = document.getElementById("study-card");
+    const firstFrontField = curStudyProject.frontFields[0] || "";
+    const classField = curStudyProject.classField;
 
-            // 分類與外框著色
-            const classField = curStudyProject.classField;
-            if (classField !== "__none__") {
-                const classVal = String(rowData[classField] || "無").trim();
-                badge.innerText = classVal;
-                badge.style.display = "block";
-                cardElement.style.borderColor = curStudyProject.colorMap[classVal] || "#64748b";
-            } else {
-                badge.style.display = "none";
-                cardElement.style.borderColor = "#64748b";
-            }
+    curStudyDB.rows.sort((a, b) => {
+        const titleA = String(a[firstFrontField] || "");
+        const titleB = String(b[firstFrontField] || "");
+        
+        const classA = (classField !== "__none__" && a[classField]) ? String(a[classField]).trim() : "";
+        const classB = (classField !== "__none__" && b[classField]) ? String(b[classField]).trim() : "";
 
-            // 正反面內容判定
-            sideText.innerText = curStudyIsBack ? "反面內容 (點擊可翻面)" : "正面內容 (點擊可翻面)";
-            const activeFields = curStudyIsBack ? curStudyProject.backFields : curStudyProject.frontFields;
-
-            mainContent.innerHTML = "";
-            activeFields.forEach(f => {
-                mainContent.innerHTML += `
-                    <div class="card-field-block">
-                        <div class="card-field-title">${f}</div>
-                        <div class="card-field-value">${rowData[f] || "（空）"}</div>
-                    </div>
-                `;
-            });
+        if (type === "az") {
+            // 純 A-Z 排序
+            return titleA.localeCompare(titleB, 'zh-Hant');
+        } else if (type === "za") {
+            // 純 Z-A 排序
+            return titleB.localeCompare(titleA, 'zh-Hant');
+        } else if (type === "class-az") {
+            // 外框/分類優先，組內 A-Z
+            const classCompare = classA.localeCompare(classB, 'zh-Hant');
+            if (classCompare !== 0) return classCompare;
+            return titleA.localeCompare(titleB, 'zh-Hant');
+        } else if (type === "class-za") {
+            // 外框/分類優先，組內 Z-A
+            const classCompare = classA.localeCompare(classB, 'zh-Hant');
+            if (classCompare !== 0) return classCompare;
+            return titleB.localeCompare(titleA, 'zh-Hant');
         }
+        return 0;
+    });
 
-        function flipStudyCard() {
-            curStudyIsBack = !curStudyIsBack;
-            renderStudyCard();
+    saveData("raw_databases", curStudyDB);
+    renderStudyListView();
+    showToast("排序完成！", true);
+}
+
+function openCardViewAt(index) {
+    curStudyIndex = index;
+    curStudyIsBack = false;
+    saveLastStudyIndex(curStudyIndex);
+
+    document.getElementById("study-list-view").style.display = "none";
+    document.getElementById("study-card-view").style.display = "block";
+    renderStudyCard();
+}
+
+function backToStudyList() {
+    document.getElementById("study-card-view").style.display = "none";
+    document.getElementById("study-list-view").style.display = "block";
+    renderStudyListView();
+}
+
+// 渲染單張卡片內容與載入筆記
+function renderStudyCard() {
+    if (!curStudyDB || curStudyDB.rows.length === 0) return;
+
+    const rowData = curStudyDB.rows[curStudyIndex];
+    document.getElementById("study-index-text").innerText = `卡片位置: ${curStudyIndex + 1} / ${curStudyDB.rows.length}`;
+
+    const badge = document.getElementById("study-card-badge");
+    const sideText = document.getElementById("study-card-side");
+    const mainContent = document.getElementById("study-card-main");
+    const cardElement = document.getElementById("study-card");
+
+    const classField = curStudyProject.classField;
+    if (classField !== "__none__") {
+        const classVal = String(rowData[classField] || "無").trim();
+        badge.innerText = classVal;
+        badge.style.display = "block";
+        cardElement.style.borderColor = curStudyProject.colorMap[classVal] || "#64748b";
+    } else {
+        badge.style.display = "none";
+        cardElement.style.borderColor = "#64748b";
+    }
+
+    sideText.innerText = curStudyIsBack ? "反面內容 (點擊可翻面)" : "正面內容 (點擊可翻面)";
+    const activeFields = curStudyIsBack ? curStudyProject.backFields : curStudyProject.frontFields;
+
+    mainContent.innerHTML = "";
+    activeFields.forEach(f => {
+        mainContent.innerHTML += `
+            <div class="card-field-block">
+                <div class="card-field-title">${f}</div>
+                <div class="card-field-value">${rowData[f] || "（空）"}</div>
+            </div>
+        `;
+    });
+
+    // 載入個人筆記
+    const noteArea = document.getElementById("study-card-note");
+    if (noteArea) noteArea.value = rowData["__personal_note__"] || "";
+}
+
+// 自動儲存筆記
+let noteSaveTimer = null;
+function saveCardNote() {
+    clearTimeout(noteSaveTimer);
+    const hint = document.getElementById("note-saved-hint");
+    if (hint) hint.style.opacity = "0";
+
+    noteSaveTimer = setTimeout(async () => {
+        if (!curStudyDB) return;
+        const noteVal = document.getElementById("study-card-note").value;
+        
+        curStudyDB.rows[curStudyIndex]["__personal_note__"] = noteVal;
+        await saveData("raw_databases", curStudyDB);
+        
+        if (hint) {
+            hint.style.opacity = "1";
+            setTimeout(() => { hint.style.opacity = "0"; }, 1500);
         }
+    }, 400);
+}
 
-        function switchStudyCard(step) {
-            if (!curStudyDB) return;
-            let newIndex = curStudyIndex + step;
-            
-            // 邊界防呆
-            if (newIndex < 0) {
-                showToast("這已經是第一張卡片了！", false);
-                return;
-            }
-            if (newIndex >= curStudyDB.rows.length) {
-                showToast("已觀看完最後一張卡片！", true);
-                return;
-            }
+function flipStudyCard() {
+    curStudyIsBack = !curStudyIsBack;
+    renderStudyCard();
+}
 
-            curStudyIndex = newIndex;
-            curStudyIsBack = false; // 切換卡片時自動恢復為正面開局
-            renderStudyCard();
-        }
+function switchStudyCard(step) {
+    if (!curStudyDB) return;
+    let newIndex = curStudyIndex + step;
+    
+    if (newIndex < 0) {
+        showToast("這已經是第一張卡片了！", false);
+        return;
+    }
+    if (newIndex >= curStudyDB.rows.length) {
+        showToast("已觀看完最後一張卡片！", true);
+        return;
+    }
+
+    curStudyIndex = newIndex;
+    curStudyIsBack = false;
+    saveLastStudyIndex(curStudyIndex);
+    renderStudyCard();
+}
 
         /*************************************************************
          * 4. 建立字卡模組 (含：製作完成後自動還原重整機制)
@@ -1367,32 +1718,108 @@
             closeModal("modal-import");
         }
 
+        /*************************************************************
+         * 現存資料庫管理 & 手動新增卡片模組
+         *************************************************************/
+        let currentEditingDbName = null;
+
+        // 保留原函數名作為轉接橋樑
         async function renderRawDBList() {
-            const listContainer = document.getElementById("db-list-container");
-            listContainer.innerHTML = "";
+            await refreshDbManageModule();
+        }
+
+        async function refreshDbManageModule() {
+            const container = document.getElementById("db-list-container");
+            container.innerHTML = "";
+
             const dbs = await getAllData("raw_databases");
             if (dbs.length === 0) {
-                listContainer.innerHTML = `<div style="text-align:center; color:var(--text-sub); padding:20px;">目前無資料庫，請先匯入 Excel</div>`;
+                container.innerHTML = `<div style="text-align:center; color:var(--text-sub); padding:20px;">目前尚無任何原始資料庫</div>`;
                 return;
             }
-            dbs.forEach(database => {
-                const item = document.createElement("div");
-                item.className = "list-item";
-                item.innerHTML = `
-                    <div>
-                        <div style="font-weight:bold;">${database.dbName}</div>
-                        <div style="font-size:9.5pt; color:var(--text-sub); margin-top:4px;">共 ${database.rows.length} 筆</div>
+
+            dbs.forEach(d => {
+                container.innerHTML += `
+                    <div class="list-item" style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:10px;">
+                        <div>
+                            <div style="font-size:11pt; font-weight:bold; color:#fff;">${d.dbName}</div>
+                            <div style="font-size:8.5pt; color:var(--text-sub); margin-top:4px;">欄位: ${d.headers.join(", ")} | 資料: ${d.rows.length} 筆</div>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button onclick="openAddCardModal('${d.dbName}')" style="background:rgba(56,189,248,0.2); border:1px solid var(--accent); color:var(--accent); font-size:8.5pt; padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:bold;">＋新增卡片</button>
+                            <button onclick="deleteRawDB('${d.dbName}')" style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; color:#ef4444; font-size:8.5pt; padding:6px 10px; border-radius:6px; cursor:pointer;">刪除</button>
+                        </div>
                     </div>
-                    <button class="back-btn" style="background:#ef4444; border:none;" onclick="deleteRawDB('${database.dbName}')">刪除</button>
                 `;
-                listContainer.appendChild(item);
             });
         }
 
-        async function deleteRawDB(name) {
-            if (confirm(`確定要刪除「${name}」原始資料庫嗎？`)) {
-                await deleteData("raw_databases", name);
-                renderRawDBList();
+        // 開啟手動新增卡片 Modal
+        async function openAddCardModal(dbName) {
+            currentEditingDbName = dbName;
+            const dbs = await getAllData("raw_databases");
+            const targetDb = dbs.find(d => d.dbName === dbName);
+            if (!targetDb) return;
+
+            document.getElementById("add-card-modal-title").innerText = `新增卡片至：${dbName}`;
+            const formContainer = document.getElementById("add-card-form-fields");
+            formContainer.innerHTML = "";
+
+            targetDb.headers.forEach(h => {
+                formContainer.innerHTML += `
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label style="font-size:9pt; color:var(--text-sub); font-weight:bold;">${h}</label>
+                        <input type="text" class="input-text new-card-input" data-header="${h}" placeholder="請輸入 ${h}" style="width:100%; margin-top:4px;">
+                    </div>
+                `;
+            });
+
+            document.getElementById("modal-add-card").style.display = "flex";
+        }
+
+        // 提交新增卡片數據
+        async function submitNewCard() {
+            if (!currentEditingDbName) return;
+
+            const dbs = await getAllData("raw_databases");
+            const targetDb = dbs.find(d => d.dbName === currentEditingDbName);
+            if (!targetDb) return;
+
+            const inputs = document.querySelectorAll(".new-card-input");
+            const newRow = {};
+            let hasValue = false;
+
+            inputs.forEach(inp => {
+                const header = inp.getAttribute("data-header");
+                const val = inp.value.trim();
+                newRow[header] = val;
+                if (val) hasValue = true;
+            });
+
+            if (!hasValue) {
+                showToast("請至少填寫一個欄位！", false);
+                return;
+            }
+
+            targetDb.rows.push(newRow);
+            await saveData("raw_databases", targetDb);
+
+            showToast("成功新增 1 張卡片！", true);
+            closeModal("modal-add-card");
+            refreshDbManageModule();
+
+            if (curStudyDB && curStudyDB.dbName === currentEditingDbName) {
+                curStudyDB = targetDb;
+                renderStudyListView();
+            }
+        }
+
+        // 刪除原始資料庫
+        async function deleteRawDB(dbName) {
+            if (confirm(`確定要刪除資料庫【${dbName}】嗎？此動作無法復原！`)) {
+                await deleteData("raw_databases", dbName);
+                showToast("資料庫已成功刪除", true);
+                refreshDbManageModule();
             }
         }
 
@@ -1436,5 +1863,14 @@
 
         window.addEventListener("DOMContentLoaded", () => { initIndexedDB(); });
     </script>
+    <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('Service Worker 註冊成功'))
+        .catch(err => console.log('Service Worker 註冊失敗:', err));
+    });
+  }
+</script>
 </body>
 </html>
