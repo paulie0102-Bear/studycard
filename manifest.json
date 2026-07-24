@@ -1,0 +1,24 @@
+{
+  "name": "Smart Cards 學習字卡",
+  "short_name": "SmartCards",
+  "description": "純前端本機學習字卡系統",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/paulie0102-Bear/studycard/refs/heads/main/paw.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/paulie0102-Bear/studycard/refs/heads/main/paw.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
