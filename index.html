@@ -574,8 +574,19 @@
             </select>
         </div>
 
-        <!-- 第一階段：卡片總覽列表 (ListView + 分類與字母排序) -->
+        <!-- 第一階段：卡片總覽列表 (ListView + 分類與字母排序 + 即時搜尋) -->
 <div id="study-list-view" style="display:none; margin-top:20px;">
+    
+    <!-- 🔍 新增：即時關鍵字搜尋框 -->
+    <div style="margin-bottom: 12px;">
+        <input type="text" 
+               id="study-search-input" 
+               class="input-text" 
+               placeholder="🔍 輸入關鍵字即時搜尋..." 
+               oninput="onStudySearchInput()"
+               style="width: 100%; box-sizing: border-box; padding: 10px 14px; font-size: 9.5pt; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: #fff;">
+    </div>
+
     <!-- 排序與控制工具列 -->
     <div style="background:rgba(255,255,255,0.05); padding:10px 12px; border-radius:8px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between;">
         <span id="study-progress-badge" style="font-size:9.5pt; color:var(--accent); font-weight:bold;"></span>
@@ -981,6 +992,12 @@ async function onStudyProjectSelect() {
         return;
     }
 
+    // 🧹 切換專案時，自動清空上次留下的搜尋關鍵字
+    const searchInput = document.getElementById("study-search-input");
+    if (searchInput) {
+        searchInput.value = "";
+    }
+
     cardView.style.display = "none";
     listView.style.display = "block";
     renderStudyListView();
@@ -999,27 +1016,70 @@ function saveLastStudyIndex(index) {
     localStorage.setItem(`study_last_idx_${curStudyProject.projectName}`, index);
 }
 
-// 渲染列表檢視 (包含刪除按鈕與直覺點擊開啟)
+// 1. 搜尋欄位觸發事件 (輸入/刪除文字時自動重繪列表)
+function onStudySearchInput() {
+    renderStudyListView();
+}
+
+// 2. 渲染列表檢視 (支援即時關鍵字過濾搜尋)
 function renderStudyListView() {
     const container = document.getElementById("study-items-container");
     const badge = document.getElementById("study-progress-badge");
+    const searchInput = document.getElementById("study-search-input");
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : "";
+
     container.innerHTML = "";
 
+    if (!curStudyDB || !curStudyDB.rows) return;
+
+    const firstFrontField = curStudyProject.frontFields[0] || "";
+    const classField = curStudyProject.classField;
+
+    // 關鍵字過濾（保留卡片原始 index，確保點擊/刪除時不會錯位）
+    const filteredRows = curStudyDB.rows
+        .map((row, originalIndex) => ({ row, originalIndex }))
+        .filter(({ row }) => {
+            if (!query) return true; // 未輸入搜尋詞時顯示全部
+
+            // 全方位搜尋：正面欄位 + 反面欄位 + 分類
+            const searchTargets = [
+                ...curStudyProject.frontFields.map(f => row[f]),
+                ...curStudyProject.backFields.map(f => row[f]),
+                (classField !== "__none__" ? row[classField] : "")
+            ];
+
+            return searchTargets.some(val => 
+                val && String(val).toLowerCase().includes(query)
+            );
+        });
+
+    // 更新進度與數量標籤
     const lastIdx = getLastStudyIndex();
-    if (lastIdx >= 0 && lastIdx < curStudyDB.rows.length) {
+    if (query) {
+        badge.innerText = `搜尋結果: 共 ${filteredRows.length} / ${curStudyDB.rows.length} 項`;
+    } else if (lastIdx >= 0 && lastIdx < curStudyDB.rows.length) {
         badge.innerText = `上次學習到第 ${lastIdx + 1} 項 (共 ${curStudyDB.rows.length} 項)`;
     } else {
         badge.innerText = `共 ${curStudyDB.rows.length} 項`;
     }
 
-    const firstFrontField = curStudyProject.frontFields[0] || "";
+    // 無搜尋結果時的提示
+    if (filteredRows.length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:30px 10px; color:var(--text-sub); font-size:9.5pt;">
+                🔍 找不到包含「<span style="color:var(--accent);">${query}</span>」的卡片
+            </div>
+        `;
+        return;
+    }
 
-    curStudyDB.rows.forEach((row, idx) => {
-        const isLastRead = (idx === lastIdx);
-        const mainTitle = row[firstFrontField] || `卡片 #${idx + 1}`;
+    // 渲染過濾後的卡片清單
+    filteredRows.forEach(({ row, originalIndex }) => {
+        const isLastRead = (originalIndex === lastIdx);
+        const rawTitle = row[firstFrontField] !== undefined && row[firstFrontField] !== null ? String(row[firstFrontField]) : "";
+        const mainTitle = rawTitle.trim() !== "" ? rawTitle : `卡片 #${originalIndex + 1}`;
 
         let classTagHtml = "";
-        const classField = curStudyProject.classField;
         if (classField !== "__none__" && row[classField]) {
             const classVal = String(row[classField]).trim();
             const color = curStudyProject.colorMap[classVal] || "#64748b";
@@ -1041,30 +1101,32 @@ function renderStudyListView() {
         itemEl.innerHTML = `
             <div style="flex:1; margin-right:12px;">
                 <div style="font-size:10.5pt; font-weight:600; color:#fff; display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
-                    <span>#${idx + 1}. ${mainTitle}</span>
+                    <span>#${originalIndex + 1}. ${mainTitle}</span>
                     ${classTagHtml}
                 </div>
                 ${lastMarkerHtml}
             </div>
             <div style="display:flex; align-items:center; gap:10px;">
-                <button title="刪除這張卡片" class="delete-btn-${idx}" style="background:rgba(239,68,68,0.2); color:#f87171; border:1px solid rgba(239,68,68,0.4); padding:4px 8px; border-radius:6px; font-size:8.5pt; cursor:pointer;">刪除</button>
+                <button title="刪除這張卡片" class="delete-btn-${originalIndex}" style="background:rgba(239,68,68,0.2); color:#f87171; border:1px solid rgba(239,68,68,0.4); padding:4px 8px; border-radius:6px; font-size:8.5pt; cursor:pointer;">刪除</button>
                 <div style="font-size:12pt; color:var(--text-sub);">›</div>
             </div>
         `;
 
-        // 點擊區域：排除刪除按鈕後點擊卡片開啟詳細視窗
+        // 點擊事件：精準綁定原始的 originalIndex，確保搜尋後開對卡片
         itemEl.onclick = (e) => {
-            if (e.target.classList.contains(`delete-btn-${idx}`)) {
+            if (e.target.classList.contains(`delete-btn-${originalIndex}`)) {
                 e.stopPropagation();
-                deleteStudyCard(idx);
+                deleteStudyCard(originalIndex);
                 return;
             }
-            openCardViewAt(idx);
+            openCardViewAt(originalIndex);
         };
 
         container.appendChild(itemEl);
     });
 }
+
+
 
 // 刪除指定卡片
 async function deleteStudyCard(index) {
