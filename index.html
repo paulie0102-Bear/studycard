@@ -2103,53 +2103,91 @@ async function deleteRawDB(dbName) {
         window.addEventListener("DOMContentLoaded", () => { initIndexedDB(); });
 
 
-        /*************************************************************
- * 語音發音模組 (Web Speech API + 自動語言判定)
+/*************************************************************
+ * 語音發音模組 (支援 WebView / PWA / Web 雙引擎自動備援)
  *************************************************************/
 
-// 1. 自動辨識文字語言
+// 1. 自動辨識文字語言 (回傳標準語言與備用短代碼)
 function detectLanguage(text) {
-    if (!text) return 'en-US';
+    if (!text) return { full: 'en-US', short: 'en' };
     
     // 是否包含日文假名 (平假名/片假名)
     if (/[\u3040-\u30ff]/.test(text)) {
-        return 'ja-JP';
+        return { full: 'ja-JP', short: 'ja' };
     }
     // 是否包含韓文
     if (/[\uac00-\ud7af]/.test(text)) {
-        return 'ko-KR';
+        return { full: 'ko-KR', short: 'ko' };
     }
     // 是否包含中文（繁體/簡體）
     if (/[\u4e00-\u9fa5]/.test(text)) {
-        return 'zh-TW';
+        return { full: 'zh-TW', short: 'zh-TW' };
     }
-    // 預設為英文 (醫學名詞、普通英文單字皆適用)
-    return 'en-US';
+    // 預設為英文
+    return { full: 'en-US', short: 'en' };
 }
 
 // 2. 核心發音播放函式
 function speakText(text, event) {
-    // 阻止事件冒泡 (防止點擊喇叭按鈕時觸發卡片翻面)
+    // 阻止事件冒泡 (防止點擊喇叭按鈕時觸發卡片翻面或頁面切換)
     if (event) {
         event.stopPropagation();
     }
 
     if (!text || text.trim() === '' || text === '（空）') return;
 
-    if ('speechSynthesis' in window) {
-        // 取消先前尚未播完的語音
-        window.speechSynthesis.cancel();
+    const cleanText = text.replace(/<[^>]*>?/gm, '').trim(); // 清理 HTML 標籤
+    const langObj = detectLanguage(cleanText);
 
-        const cleanText = text.replace(/<[^>]*>?/gm, ''); // 清理可能的 HTML 標籤
-        const utterance = new SpeechSynthesisUtterance(cleanText);
+    // 🌟 優先嘗試：瀏覽器原生 Web Speech API
+    if ('speechSynthesis' in window && window.speechSynthesis) {
+        try {
+            window.speechSynthesis.cancel(); // 停止上一段發音
+
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            utterance.lang = langObj.full;
+            utterance.rate = 0.85; // 語速稍微放慢
+
+            let hasSpoken = false;
+            utterance.onstart = () => { hasSpoken = true; };
+
+            window.speechSynthesis.speak(utterance);
+
+            // 防護機制：如果 400ms 後 Android WebView 或 iOS PWA 靜音沒反應，自動切換至備用線上語音
+            setTimeout(() => {
+                if (!hasSpoken && !window.speechSynthesis.speaking) {
+                    playFallbackTTS(cleanText, langObj.short);
+                }
+            }, 400);
+
+            return;
+        } catch (e) {
+            console.warn("原生 Web Speech 失敗，切換至備用線上語音引擎", e);
+        }
+    }
+
+    // 🌟 備用方案：如果原生 API 被 App 環境完全封鎖，使用線上語音引擎
+    playFallbackTTS(cleanText, langObj.short);
+}
+
+// 3. 備用線上語音播放器 (專治 App / WebView 不支援原生語音的問題)
+function playFallbackTTS(text, langShort) {
+    try {
+        const encodedText = encodeURIComponent(text);
+        const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=${langShort}&client=tw-ob`;
         
-        // 自動判定語言種類
-        utterance.lang = detectLanguage(cleanText);
-        utterance.rate = 0.85; // 語速稍微放慢一點，方便聽清發音與醫學專有名詞
-
-        window.speechSynthesis.speak(utterance);
-    } else {
-        showToast("您的瀏覽器不支援語音朗讀功能", false);
+        const audio = new Audio(audioUrl);
+        audio.playbackRate = 0.9;
+        audio.play().catch(err => {
+            console.error("語音播放失敗:", err);
+            if (typeof showToast === "function") {
+                showToast("無法播放語音，請檢查手機音量或網路連線", false);
+            }
+        });
+    } catch (err) {
+        if (typeof showToast === "function") {
+            showToast("您的裝置不支援語音功能", false);
+        }
     }
 }
     </script>
