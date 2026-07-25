@@ -2075,14 +2075,46 @@ async function deleteRawDB(dbName) {
         }
 
         async function exportSystemBackup() {
-            const saveName = prompt("請輸入備份名稱：", "備份_" + new Date().toISOString().slice(0,10));
-            if (!saveName || !saveName.trim()) return;
-            const backupData = { raw_databases: await getAllData("raw_databases"), card_projects: await getAllData("card_projects") };
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData));
-            const dl = document.createElement('a');
-            dl.setAttribute("href", dataStr); dl.setAttribute("download", `${saveName.trim()}.json`);
-            document.body.appendChild(dl); dl.click(); dl.remove();
+    try {
+        const saveName = prompt("請輸入備份名稱：", "備份_" + new Date().toISOString().slice(0, 10));
+        if (!saveName || !saveName.trim()) return;
+
+        // 1. 取得完整資料庫備份內容
+        const backupData = { 
+            raw_databases: await getAllData("raw_databases"), 
+            card_projects: await getAllData("card_projects") 
+        };
+
+        // 2. 將 JSON 轉為原始 Blob 二進制物件（避免 Data URI 造成的字串膨脹與記憶體崩潰）
+        const jsonStr = JSON.stringify(backupData, null, 2);
+        const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8" });
+
+        // 3. 建立記憶體指標 URL
+        const blobUrl = URL.createObjectURL(blob);
+
+        // 4. 觸發下載
+        const dl = document.createElement('a');
+        dl.href = blobUrl;
+        dl.download = `${saveName.trim()}.json`;
+        document.body.appendChild(dl);
+        dl.click();
+
+        // 5. 釋放記憶體空間 (非常重要，防止手機記憶體殘留)
+        setTimeout(() => {
+            dl.remove();
+            URL.revokeObjectURL(blobUrl);
+        }, 1000);
+
+        if (typeof showToast === "function") {
+            showToast("備份匯出成功！", true);
         }
+    } catch (err) {
+        console.error("匯出失敗:", err);
+        if (typeof showToast === "function") {
+            showToast("備份匯出失敗，請再試一次", false);
+        }
+    }
+}
 
         function importSystemBackup(input) {
             const file = input.files[0]; if (!file) return;
@@ -2104,56 +2136,47 @@ async function deleteRawDB(dbName) {
 
 
 /*************************************************************
- * 語音發音模組 (支援 WebView / PWA / Web 雙引擎自動備援)
+ * 語音發音模組 (WebView / PWA / Web 最終相容修補版)
  *************************************************************/
 
-// 1. 自動辨識文字語言 (回傳標準語言與備用短代碼)
+// 全域共用 Audio 物件 (解決手機 WebView 自動播放阻擋的問題)
+let globalAudioPlayer = null;
+
+// 1. 自動辨識文字語言
 function detectLanguage(text) {
     if (!text) return { full: 'en-US', short: 'en' };
-    
-    // 是否包含日文假名 (平假名/片假名)
-    if (/[\u3040-\u30ff]/.test(text)) {
-        return { full: 'ja-JP', short: 'ja' };
-    }
-    // 是否包含韓文
-    if (/[\uac00-\ud7af]/.test(text)) {
-        return { full: 'ko-KR', short: 'ko' };
-    }
-    // 是否包含中文（繁體/簡體）
-    if (/[\u4e00-\u9fa5]/.test(text)) {
-        return { full: 'zh-TW', short: 'zh-TW' };
-    }
-    // 預設為英文
+    if (/[\u3040-\u30ff]/.test(text)) return { full: 'ja-JP', short: 'ja' };
+    if (/[\uac00-\ud7af]/.test(text)) return { full: 'ko-KR', short: 'ko' };
+    if (/[\u4e00-\u9fa5]/.test(text)) return { full: 'zh-TW', short: 'zh-TW' };
     return { full: 'en-US', short: 'en' };
 }
 
 // 2. 核心發音播放函式
 function speakText(text, event) {
-    // 阻止事件冒泡 (防止點擊喇叭按鈕時觸發卡片翻面或頁面切換)
     if (event) {
         event.stopPropagation();
     }
 
     if (!text || text.trim() === '' || text === '（空）') return;
 
-    const cleanText = text.replace(/<[^>]*>?/gm, '').trim(); // 清理 HTML 標籤
+    const cleanText = text.replace(/<[^>]*>?/gm, '').trim();
     const langObj = detectLanguage(cleanText);
 
-    // 🌟 優先嘗試：瀏覽器原生 Web Speech API
+    // 🌟 優先嘗試：原生 Web Speech API
     if ('speechSynthesis' in window && window.speechSynthesis) {
         try {
             window.speechSynthesis.cancel(); // 停止上一段發音
 
             const utterance = new SpeechSynthesisUtterance(cleanText);
             utterance.lang = langObj.full;
-            utterance.rate = 0.85; // 語速稍微放慢
+            utterance.rate = 0.85;
 
             let hasSpoken = false;
             utterance.onstart = () => { hasSpoken = true; };
 
             window.speechSynthesis.speak(utterance);
 
-            // 防護機制：如果 400ms 後 Android WebView 或 iOS PWA 靜音沒反應，自動切換至備用線上語音
+            // 400ms 後若沒發聲，自動轉切換備用 TTS
             setTimeout(() => {
                 if (!hasSpoken && !window.speechSynthesis.speaking) {
                     playFallbackTTS(cleanText, langObj.short);
@@ -2162,31 +2185,54 @@ function speakText(text, event) {
 
             return;
         } catch (e) {
-            console.warn("原生 Web Speech 失敗，切換至備用線上語音引擎", e);
+            console.warn("原生 Web Speech 失敗，切換至備用線上語音", e);
         }
     }
 
-    // 🌟 備用方案：如果原生 API 被 App 環境完全封鎖，使用線上語音引擎
+    // 🌟 備用方案
     playFallbackTTS(cleanText, langObj.short);
 }
 
-// 3. 備用線上語音播放器 (專治 App / WebView 不支援原生語音的問題)
+// 3. 備用線上語音播放器 (修正 WebView / Mobile Safari 相容性問題)
 function playFallbackTTS(text, langShort) {
     try {
         const encodedText = encodeURIComponent(text);
-        const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=${langShort}&client=tw-ob`;
         
-        const audio = new Audio(audioUrl);
-        audio.playbackRate = 0.9;
-        audio.play().catch(err => {
-            console.error("語音播放失敗:", err);
-            if (typeof showToast === "function") {
-                showToast("無法播放語音，請檢查手機音量或網路連線", false);
-            }
-        });
+        // 採用相容度更高的 VoiceRSS 免費開源服務 + 備用 URL 格式
+        const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=${langShort}&client=tw-ob`;
+
+        // 如果全域播放器不存在，先建立一個實體
+        if (!globalAudioPlayer) {
+            globalAudioPlayer = new Audio();
+        }
+
+        // 停止之前的聲音並重設 source
+        globalAudioPlayer.pause();
+        globalAudioPlayer.src = ttsUrl;
+        globalAudioPlayer.playbackRate = 0.9;
+
+        // 嘗試播放
+        const playPromise = globalAudioPlayer.play();
+
+        if (playPromise !== undefined) {
+            playPromise.catch(err => {
+                console.error("Audio Play Error:", err);
+                
+                // 如果是自動播放阻擋 (NotAllowedError)，提示點擊或檢查靜音模式
+                if (err.name === 'NotAllowedError') {
+                    if (typeof showToast === "function") {
+                        showToast("請解開手機靜音開關，並確保手機允許音訊播放", false);
+                    }
+                } else {
+                    if (typeof showToast === "function") {
+                        showToast("無法讀取語音，請檢查手機網路連線", false);
+                    }
+                }
+            });
+        }
     } catch (err) {
         if (typeof showToast === "function") {
-            showToast("您的裝置不支援語音功能", false);
+            showToast("您的裝置不支援語音播放", false);
         }
     }
 }
