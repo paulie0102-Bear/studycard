@@ -1146,6 +1146,7 @@ function backToStudyList() {
 }
 
 // 渲染單張卡片內容與載入筆記
+// 渲染單張卡片內容與載入筆記 (含發音按鈕)
 function renderStudyCard() {
     if (!curStudyDB || curStudyDB.rows.length === 0) return;
 
@@ -1173,10 +1174,28 @@ function renderStudyCard() {
 
     mainContent.innerHTML = "";
     activeFields.forEach(f => {
+        const rawVal = rowData[f] !== undefined && rowData[f] !== null ? String(rowData[f]) : "";
+        const displayVal = rawVal.trim() !== "" ? rawVal : "（空）";
+        
+        // 為了避免單雙引號造成 HTML 屬性解析錯誤，進行轉義處理
+        const safeText = rawVal.replace(/"/g, '&quot;');
+
         mainContent.innerHTML += `
             <div class="card-field-block">
-                <div class="card-field-title">${f}</div>
-                <div class="card-field-value">${rowData[f] || "（空）"}</div>
+                <div class="card-field-title" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>${f}</span>
+                    ${rawVal.trim() !== "" ? `
+                        <button type="button" 
+                                class="speech-btn" 
+                                data-text="${safeText}" 
+                                onclick="speakText(this.getAttribute('data-text'), event)" 
+                                title="播放發音"
+                                style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:12pt; padding:2px 6px;">
+                            🔊
+                        </button>
+                    ` : ''}
+                </div>
+                <div class="card-field-value">${displayVal}</div>
             </div>
         `;
     });
@@ -2020,6 +2039,57 @@ async function deleteRawDB(dbName) {
         }
 
         window.addEventListener("DOMContentLoaded", () => { initIndexedDB(); });
+
+
+        /*************************************************************
+ * 語音發音模組 (Web Speech API + 自動語言判定)
+ *************************************************************/
+
+// 1. 自動辨識文字語言
+function detectLanguage(text) {
+    if (!text) return 'en-US';
+    
+    // 是否包含日文假名 (平假名/片假名)
+    if (/[\u3040-\u30ff]/.test(text)) {
+        return 'ja-JP';
+    }
+    // 是否包含韓文
+    if (/[\uac00-\ud7af]/.test(text)) {
+        return 'ko-KR';
+    }
+    // 是否包含中文（繁體/簡體）
+    if (/[\u4e00-\u9fa5]/.test(text)) {
+        return 'zh-TW';
+    }
+    // 預設為英文 (醫學名詞、普通英文單字皆適用)
+    return 'en-US';
+}
+
+// 2. 核心發音播放函式
+function speakText(text, event) {
+    // 阻止事件冒泡 (防止點擊喇叭按鈕時觸發卡片翻面)
+    if (event) {
+        event.stopPropagation();
+    }
+
+    if (!text || text.trim() === '' || text === '（空）') return;
+
+    if ('speechSynthesis' in window) {
+        // 取消先前尚未播完的語音
+        window.speechSynthesis.cancel();
+
+        const cleanText = text.replace(/<[^>]*>?/gm, ''); // 清理可能的 HTML 標籤
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        
+        // 自動判定語言種類
+        utterance.lang = detectLanguage(cleanText);
+        utterance.rate = 0.85; // 語速稍微放慢一點，方便聽清發音與醫學專有名詞
+
+        window.speechSynthesis.speak(utterance);
+    } else {
+        showToast("您的瀏覽器不支援語音朗讀功能", false);
+    }
+}
     </script>
     <script>
   if ('serviceWorker' in navigator) {
