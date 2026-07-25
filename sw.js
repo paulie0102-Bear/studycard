@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smartcards-v1.3'; // 👈 每次修改 GitHub 時改這裡 (例如 v1.2)
+const CACHE_NAME = 'smartcards-v1.4'; // 👈 每次修改 GitHub 時改這裡 (例如 v1.2)
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
