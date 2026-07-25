@@ -2156,9 +2156,27 @@ function speakText(text, event) {
     <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('Service Worker 註冊成功'))
-        .catch(err => console.log('Service Worker 註冊失敗:', err));
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        console.log('Service Worker 註冊成功');
+
+        // 1. 每次打開 App 時，強制要求檢查 GitHub 上有沒有新版本
+        reg.update();
+
+        // 2. 監聽是否有新的 Service Worker 正在等待套用
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // 發現新版本！自動刷新頁面或提示使用者
+              console.log('發現新版本，準備更新...');
+              if (confirm('🎉 發現軟體新版本！是否立即載入最新功能？')) {
+                window.location.reload();
+              }
+            }
+          });
+        });
+
+      }).catch(err => console.log('Service Worker 註冊失敗:', err));
     });
   }
 </script>
